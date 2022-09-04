@@ -132,31 +132,10 @@ server <- function(input, output) {
     
   })
   
-    # 
-    # imagefiles <- c("C:\\LocalData/bespalov/OneDrive - University of Helsinki/R projects/ImageAnalysis/1.tif",
-    #                 "C:\\LocalData/bespalov/OneDrive - University of Helsinki/R projects/ImageAnalysis/2.tif",
-    #                 "C:\\LocalData/bespalov/OneDrive - University of Helsinki/R projects/ImageAnalysis/3.tif",
-    #                 "C:\\LocalData/bespalov/OneDrive - University of Helsinki/R projects/ImageAnalysis/4.tif",
-    #                 "C:\\LocalData/bespalov/OneDrive - University of Helsinki/R projects/ImageAnalysis/5.tif")
-    
-    #b64 <- base64enc::dataURI(file = inFile$datapath, mime = "image/tif")
-    #img3 = readImage(imagefiles)
-  
- 
-    
-    
+   
     
   
-    # 
-    # img <- readTIFF(b64, native=TRUE)
-    # b64 <- writeJPEG(img, target = b64, quality = 1)
-    
-    # insertUI(
-    #   selector = "#image-container",
-    #   where = "afterBegin",
-    #   ui = img(src = b64, width = 250, height = 250)
-    # )
-  
+   
   
   observeEvent(input$buildPlot, {
             output$plot <- renderPlot({
@@ -192,31 +171,11 @@ server <- function(input, output) {
               nucMask = cellsSmooth[,, 1] - filter2(cellsSmooth[ , , 1], disc) > 0
               nucMask = fillHull(nucMask)
               nuclei = propagate(cellsSmooth[,,1], nucSeed, mask = nucMask)
-              #EBImage::display(nuclei,method = "raster")
-              # 
-              # bgPars = function(x) {
-              #   x    = log(x)
-              #   loc  = half.range.mode( x )
-              #   left = (x - loc)[ x < loc ]
-              #   wid  = sqrt( mean(left^2) )
-              #   c(loc = loc, wid = wid, thr = loc + 6*wid)
-              # }
-              # cellBg = apply(cellsSmooth, MARGIN = 3, FUN = bgPars)
-              # 
-              # cytoplasmMask = (cellsSmooth[,,2] > exp(cellBg["thr", 2])) |
-              #   nuclei | (cellsSmooth[,,3] > exp(cellBg["thr", 3]))
-              # 
-              # cellbodies = propagate(x = cellsSmooth[ , , 3], seeds = nuclei,
-              #                        lambda = 1.0e-2, mask = cytoplasmMask)
+            
               
               nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3[, , 1]), col = "#ffff00")
               
-              # cellsColor = rgbImage(red   = img3[,, 3],
-              #                       green = img3[,, 2],
-              #                       blue  = img3[,, 1])
-              # nucSegOnAll  = paintObjects(nuclei, tgt = cellsColor, col = "#ffff00")
-              # 
-              # cellSegOnAll = paintObjects(cellbodies, tgt = nucSegOnAll, col = "#ff0080")
+            
               
 
               fr1 = computeFeatures(nuclei,     img3[,,1], xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
@@ -323,29 +282,11 @@ server <- function(input, output) {
       nuclei = propagate(cellsSmooth[,,1], nucSeed, mask = nucMask)
       #EBImage::display(nuclei,method = "raster")
       
-      # bgPars = function(x) {
-      #   x    = log(x)
-      #   loc  = half.range.mode( x )
-      #   left = (x - loc)[ x < loc ]
-      #   wid  = sqrt( mean(left^2) )
-      #   c(loc = loc, wid = wid, thr = loc + 6*wid)
-      # }
-      # cellBg = apply(cellsSmooth, MARGIN = 3, FUN = bgPars)
-      # 
-      # cytoplasmMask = (cellsSmooth[,,2] > exp(cellBg["thr", 2])) |
-      #   nuclei | (cellsSmooth[,,3] > exp(cellBg["thr", 3]))
-      # 
-      # cellbodies = propagate(x = cellsSmooth[ , , 3], seeds = nuclei,
-      #                        lambda = 1.0e-2, mask = cytoplasmMask)
+     
       
       nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3[, , 1]), col = "#ffff00")
       
-      # cellsColor = rgbImage(red   = img3[,, 3],
-      #                       green = img3[,, 2],
-      #                       blue  = img3[,, 1])
-      # nucSegOnAll  = paintObjects(nuclei, tgt = cellsColor, col = "#ffff00")
-      # 
-      # cellSegOnAll = paintObjects(cellbodies, tgt = nucSegOnAll, col = "#ff0080")
+      
       
       
       fr1 = computeFeatures(nuclei,     img3[,,1], xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
@@ -385,13 +326,9 @@ server <- function(input, output) {
     
     img3 = readImage(files = input$files$datapath)
     
-    # w = makeBrush(size = 101, shape = "gaussian", sigma = 7)
-    # tibble(w = w[(nrow(w)+1)/2, ])
-    # #%>%
-    #  # ggplot(aes(y = w, x = seq(along = w))) + geom_point()
+   
     
-    #nucSmooth = filter2(getFrame(img3, 1), w)
-    
+       
     cellsSmooth = Image(dim = dim(img3))
     
     sigma <- rep (7, dim(img3)[3])
@@ -415,31 +352,11 @@ server <- function(input, output) {
     nucMask = cellsSmooth[,, 1] - filter2(cellsSmooth[ , , 1], disc) > 0
     nucMask = fillHull(nucMask)
     nuclei = propagate(cellsSmooth[,,1], nucSeed, mask = nucMask)
-    #EBImage::display(nuclei,method = "raster")
-    
-    # bgPars = function(x) {
-    #   x    = log(x)
-    #   loc  = half.range.mode( x )
-    #   left = (x - loc)[ x < loc ]
-    #   wid  = sqrt( mean(left^2) )
-    #   c(loc = loc, wid = wid, thr = loc + 6*wid)
-    # }
-    # cellBg = apply(cellsSmooth, MARGIN = 3, FUN = bgPars)
-    # 
-    # cytoplasmMask = (cellsSmooth[,,2] > exp(cellBg["thr", 2])) |
-    #   nuclei | (cellsSmooth[,,3] > exp(cellBg["thr", 3]))
-    # 
-    # cellbodies = propagate(x = cellsSmooth[ , , 3], seeds = nuclei,
-    #                        lambda = 1.0e-2, mask = cytoplasmMask)
+  
     
     nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3[, , 1]), col = "#ffff00")
     
-    # cellsColor = rgbImage(red   = img3[,, 3],
-    #                       green = img3[,, 2],
-    #                       blue  = img3[,, 1])
-    # nucSegOnAll  = paintObjects(nuclei, tgt = cellsColor, col = "#ffff00")
-    # 
-    # cellSegOnAll = paintObjects(cellbodies, tgt = nucSegOnAll, col = "#ff0080")
+   
     
     f <- nucSegOnNuc
     f
