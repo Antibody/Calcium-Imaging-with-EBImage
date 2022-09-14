@@ -140,31 +140,7 @@ server <- function(input, output) {
     
   })
   
-  # 
-  # imagefiles <- c("C:\\Users/maxim/Documents/R-projects/1.tif",
-  #                 "C:\\Users/maxim/Documents/R-projects/2.tif",
-  #                 "C:\\Users/maxim/Documents/R-projects/3.tif",
-  #                 "C:\\Users/maxim/Documents/R-projects/4.tif",
-  #                  "C:\\Users/maxim/Documents/R-projects/5.tif")
-  
-  #b64 <- base64enc::dataURI(file = inFile$datapath, mime = "image/tif")
-  #img3 = readImage(imagefiles)
-  
-  
-  
-  
-  
-  
-  # 
-  # img <- readTIFF(b64, native=TRUE)
-  # b64 <- writeJPEG(img, target = b64, quality = 1)
-  
-  # insertUI(
-  #   selector = "#image-container",
-  #   where = "afterBegin",
-  #   ui = img(src = b64, width = 250, height = 250)
-  # )
-  
+
   
   
   observeEvent(input$buildPlot, {
@@ -219,13 +195,7 @@ server <- function(input, output) {
       ##++++++++++++++++++++++++++++ Detrending ++++++++++++++++++++++++++++++++++++++++###
       if (input$detrend == TRUE) {
         
-        #cn <- colnames(data) # for later use in the returning original column names
-        
-        #library(pracma)
-        
-        # br <- 4                                                        # You can try different break points
-        # break.points <- seq(from=br,to=dim(data)[1], by=br)
-        # data.dt <- data                                                 # create a duplicate data frame
+       
         
         dat31 <- c()
         for(i in 1:dim(data)[2]){
@@ -614,131 +584,7 @@ server <- function(input, output) {
     output$table = renderPrint({                      # create output for displaying a correlation table summary in UI
       tableInput()
       
-      # img3 = readImage(files = input$files$datapath)
-      # 
-      # cellsSmooth = Image(dim = dim(img3))
-      # 
-      # sigma <- rep (7, dim(img3)[3])
-      # for(i in seq_along(sigma)) {
-      #   cellsSmooth[,,i] = filter2(
-      #     img3[,,i],
-      #     filter = makeBrush(size = 101, shape = "gaussian",
-      #                        sigma = sigma[i])
-      #   )
-      # }
-      # 
-      # disc = makeBrush(101, "disc")
-      # disc = disc / sum(disc)
-      # offset = 0.07
-      # nucThresh = (cellsSmooth[,,1] - filter2( cellsSmooth[,,1], disc ) > offset)
-      # 
-      # nucOpened = EBImage::opening(nucThresh, kern = makeBrush(3, shape = "disc"))
-      # 
-      # nucSeed = bwlabel(nucOpened)
-      # 
-      # nucMask = cellsSmooth[,, 1] - filter2(cellsSmooth[ , , 1], disc) > 0
-      # nucMask = fillHull(nucMask)
-      # nuclei = propagate(cellsSmooth[,,1], nucSeed, mask = nucMask)
-      # #EBImage::display(nuclei,method = "raster")
-      # 
-      # 
-      # nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3[, , 1]), col = "#ffff00")
-      # 
-      # 
-      # 
-      # 
-      # fr1 = computeFeatures(nuclei,     img3[,,1], xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
-      # data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
-      # 
-      # for(i in 1:dim(img3)[3]) {                             # Head of for-loop
-      #   
-      #   
-      #   new_col <- computeFeatures(nuclei,     img3[,,i], xname = "Frame_",
-      #                              refnames = "fr_")                      # Creating new variable
-      #   data[ , i] <- new_col[,12]                     # Adding new variable to data
-      #   colnames(data)[i] <- paste0("", i)    # Renaming new variable
-      # }
-      # 
-      # 
-      # data.c <- cbind(Cell = c(1:dim(fr1)[1]), data)
-      # 
-      # dat1.t <- t(data.c)
-      # dat1.t.NoC <- dat1.t[-1,]
-      # colnames(dat1.t.NoC) <- c(1:dim(dat1.t.NoC)[2])
-      # data.t.c <- cbind(Time = c(1:dim(dat1.t.NoC)[1]), dat1.t.NoC)
-      # rownames(data.t.c) <- NULL
-      # dat1 <- data.t.c
-      # 
-      # cl <- c("Time_Frame",paste0("Cell.0",1:9),paste0("Cell.",10:(dim(dat1)[2]-1)))
-      # colnames(dat1) <- cl
-      # dat1 <- as.data.frame.array(dat1)
-      # 
-      # dat1.dt <- dat1                                                    #new dataframe for detrended ersults
-      # 
-      # for(i in 1:dim(dat1)[2]){                                          # run each Sample in a loop
-      #   dat1.dt[,i] <- detrend(dat1[,i], tt = 'linear', bp = c())       # detrend the data using linear model
-      # }; dat1.dt[,1] <- dat1[,1]
-      # 
-      # 
-      # ### Find out the range of the data and set the minimum value to zero
-      # drange <- data.frame(row.names = cl, "min" = apply(dat1.dt,2,min), "max" = apply(dat1.dt,2,max))
-      # min.vals <- matrix(rep(drange$min, dim(dat1)[1]),  ncol=dim(dat1)[2], byrow=T)
-      # dat1.dt.z <- dat1.dt-min.vals
-      # drange.z <- data.frame(row.names = cl, "min" = apply(dat1.dt.z,2,min), "max" = apply(dat1.dt.z,2,max))
-      # #################################################################
-      # 
-      # 
-      # #################################################################
-      # ####           detect peaks & smooth out the data            ####
-      # #
-      # # smoothing is needed because the raw data is very "spiky", this makes peak detection hard
-      # # peak is defined as high intensity: normalized intensity > 2x sd &
-      # # peak has >2 successive measurements increase before peak maximum &
-      # # peak has >2 successive measurements decrease after peak maximum
-      # smoothing.parameter <- 0.02                                     # Smooting parameter for lowess (larger values make smoothing rougher)
-      # successive.points <- 3                                          # how many successive points need to increase or decrease
-      # 
-      # dat1.peaks <- list()                                            # Peaks are stores in a list
-      # dat1.dt.z.s <- dat1.dt.z                                        # The smoothed values go here
-      # 
-      # for(i in 2:ncol(dat1.dt)){
-      #   tmp.data <- dat1.dt.z[,i]
-      #   noiselevel <- 2*sd(tmp.data)
-      #   tmp.data <- lowess(tmp.data, f=smoothing.parameter)$y
-      #   dat1.dt.z.s[,i] <- tmp.data
-      #   tmp <- findpeaks(tmp.data, nups=successive.points, ndowns=successive.points, minpeakheight=noiselevel )
-      #   if(is.null(tmp[,1])) { tmp <- matrix(NA,ncol=4) }
-      #   else { tmp <- tmp }
-      #   tmp <- data.frame("Intensity" = tmp[,1], "Peak.max"=tmp[,2], "Peak.start"=tmp[,4], "Peak.end"=tmp[,4], "Noiselevel" = noiselevel)
-      #   dat1.peaks[[i-1]] <- tmp
-      # }; names(dat1.peaks) <- colnames(dat1.dt)[-1]
-      # 
-      # ####################################################################
-      # ################ correlation table summary generation ##
-      # 
-      # pairwise.combn <- t(combn(2:dim(dat1)[2],2))
-      # 
-      # p.val <- c()
-      # rq <- c()
-      # cors <- c()
-      # for(i in 1:dim(pairwise.combn)[1]){
-      #   lm1 <- summary(lm(dat1.dt.z[,pairwise.combn[i,1]] ~ dat1.dt.z[,pairwise.combn[i,2]] ))
-      #   p.val <- c(p.val,lm1$coefficients[2,4])
-      #   rq <- c(rq,lm1$r.squared)
-      #   cors <- c(cors,cor(dat1.dt.z[,pairwise.combn[i,1]] , dat1.dt.z[,pairwise.combn[i,2]] ))
-      # }
-      # 
-      # comb <- data.frame("X" = colnames(dat1)[pairwise.combn[,1]],
-      #                    "Y" = colnames(dat1)[pairwise.combn[,2]],
-      #                    "correlation" = cors,
-      #                    "R-squared" = rq,
-      #                    "P.value" = p.val)
-      # comb$Adj.P.Value <- p.adjust(comb$P.value)
-      # print("Adj.P.Value<0.01 ; correlation>0.8")
-      # print(comb[comb$Adj.P.Value<0.01&comb$correlation>0.8,]  )
-      
-      # comb.adj <- comb[comb$P.value<0.01&comb$correlation>0.8,]
-      # return(comb.adj)
+    
       
     })
     
@@ -769,17 +615,7 @@ server <- function(input, output) {
         plot(imgUploadedMask())
         img3 = readImage(files = input$files$datapath)
         
-        #nucSmooth = filter2(getFrame(img3, 1), w)
-        
-        # cellsSmooth = Image(dim = dim(img3))
-        # sigma <- rep (7, dim(img3)[3])
-        # for(i in seq_along(sigma)) {
-        #   cellsSmooth[,,i] = filter2(
-        #     img3[,,i],
-        #     filter = makeBrush(size = 101, shape = "gaussian",
-        #                        sigma = sigma[i])
-        #   )
-        # }
+     
         
         
         
