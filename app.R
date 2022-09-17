@@ -140,62 +140,97 @@ server <- function(input, output) {
     
   })
   
-
+  # 
+  # imagefiles <- c("C:\\Users/maxim/Documents/R-projects/1.tif",
+  #                 "C:\\Users/maxim/Documents/R-projects/2.tif",
+  #                 "C:\\Users/maxim/Documents/R-projects/3.tif",
+  #                 "C:\\Users/maxim/Documents/R-projects/4.tif",
+  #                  "C:\\Users/maxim/Documents/R-projects/5.tif")
+  
+  #b64 <- base64enc::dataURI(file = inFile$datapath, mime = "image/tif")
+  #img3 = readImage(imagefiles)
+  
+  
+  
+  
+  
+  
+  # 
+  # img <- readTIFF(b64, native=TRUE)
+  # b64 <- writeJPEG(img, target = b64, quality = 1)
+  
+  # insertUI(
+  #   selector = "#image-container",
+  #   where = "afterBegin",
+  #   ui = img(src = b64, width = 250, height = 250)
+  # )
+  
+  img3 <- reactive({
+    
+    readImage(files = input$files$datapath)
+  })
+  
   
   
   observeEvent(input$buildPlot, {
+    
+    img3 <- isolate(img3())
+    cellsSmooth = Image(dim = dim(img3))
+    
+    sigma <- rep (7, dim(img3)[3])
+    for(i in seq_along(sigma)) {
+      cellsSmooth[,,i] = filter2(
+        img3[,,i],
+        filter = makeBrush(size = 101, shape = "gaussian",
+                           sigma = sigma[i])
+      )
+    }
+    
+    disc = makeBrush(101, "disc")
+    disc = disc / sum(disc)
+    offset = 0.07
+    nucThresh = (cellsSmooth[,,1] - filter2( cellsSmooth[,,1], disc ) > offset)
+    
+    nucOpened = EBImage::opening(nucThresh, kern = makeBrush(3, shape = "disc"))
+    
+    nucSeed = bwlabel(nucOpened)
+    
+    nucMask = cellsSmooth[,, 1] - filter2(cellsSmooth[ , , 1], disc) > 0
+    nucMask = fillHull(nucMask)
+    nuclei = propagate(cellsSmooth[,,1], nucSeed, mask = nucMask)
+    #EBImage::display(nuclei,method = "raster")
+    
+    
+    nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3[, , 1]), col = "#ffff00")
+    
+    
+    
+    fr1 = computeFeatures(nuclei,     img3[,,1], xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
+    data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
+    
+    for(i in 1:dim(img3)[3]) {                             # Head of for-loop
+      
+      
+      new_col <- computeFeatures(nuclei,     img3[,,i], xname = "Frame_",
+                                 refnames = "fr_")                      # Creating new variable
+      data[ , i] <- new_col[,12]                     # Adding new variable to data
+      colnames(data)[i] <- paste0("", i)    # Renaming new variable
+    }
+    
     output$plot <- renderPlot({
-      img3 = readImage(files = input$files$datapath)
+      
       
      
-      # nucSmooth = filter2(getFrame(img3, 1), w)
-      
-      cellsSmooth = Image(dim = dim(img3))
-      
-      sigma <- rep (7, dim(img3)[3])
-      for(i in seq_along(sigma)) {
-        cellsSmooth[,,i] = filter2(
-          img3[,,i],
-          filter = makeBrush(size = 101, shape = "gaussian",
-                             sigma = sigma[i])
-        )
-      }
-      
-      disc = makeBrush(101, "disc")
-      disc = disc / sum(disc)
-      offset = 0.07
-      nucThresh = (cellsSmooth[,,1] - filter2( cellsSmooth[,,1], disc ) > offset)
-      
-      nucOpened = EBImage::opening(nucThresh, kern = makeBrush(3, shape = "disc"))
-      
-      nucSeed = bwlabel(nucOpened)
-      
-      nucMask = cellsSmooth[,, 1] - filter2(cellsSmooth[ , , 1], disc) > 0
-      nucMask = fillHull(nucMask)
-      nuclei = propagate(cellsSmooth[,,1], nucSeed, mask = nucMask)
-      #EBImage::display(nuclei,method = "raster")
-    
-      
-      nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3[, , 1]), col = "#ffff00")
-      
-      
-      
-      fr1 = computeFeatures(nuclei,     img3[,,1], xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
-      data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
-      
-      for(i in 1:dim(img3)[3]) {                             # Head of for-loop
-        
-        
-        new_col <- computeFeatures(nuclei,     img3[,,i], xname = "Frame_",
-                                   refnames = "fr_")                      # Creating new variable
-        data[ , i] <- new_col[,12]                     # Adding new variable to data
-        colnames(data)[i] <- paste0("", i)    # Renaming new variable
-      }
-      
       ##++++++++++++++++++++++++++++ Detrending ++++++++++++++++++++++++++++++++++++++++###
       if (input$detrend == TRUE) {
         
-       
+        #cn <- colnames(data) # for later use in the returning original column names
+        
+        #library(pracma)
+        
+        # br <- 4                                                        # You can try different break points
+        # break.points <- seq(from=br,to=dim(data)[1], by=br)
+        # data.dt <- data                                                 # create a duplicate data frame
         
         dat31 <- c()
         for(i in 1:dim(data)[2]){
@@ -243,132 +278,109 @@ server <- function(input, output) {
   })
   
   observeEvent(input$buildHeat, {
+    
+    img3 <- isolate(img3())
+    cellsSmooth = Image(dim = dim(img3))
+    
+    sigma <- rep (7, dim(img3)[3])
+    for(i in seq_along(sigma)) {
+      cellsSmooth[,,i] = filter2(
+        img3[,,i],
+        filter = makeBrush(size = 101, shape = "gaussian",
+                           sigma = sigma[i])
+      )
+    }
+    
+    disc = makeBrush(101, "disc")
+    disc = disc / sum(disc)
+    offset = 0.07
+    nucThresh = (cellsSmooth[,,1] - filter2( cellsSmooth[,,1], disc ) > offset)
+    
+    nucOpened = EBImage::opening(nucThresh, kern = makeBrush(3, shape = "disc"))
+    
+    nucSeed = bwlabel(nucOpened)
+    
+    nucMask = cellsSmooth[,, 1] - filter2(cellsSmooth[ , , 1], disc) > 0
+    nucMask = fillHull(nucMask)
+    nuclei = propagate(cellsSmooth[,,1], nucSeed, mask = nucMask)
+    #EBImage::display(nuclei,method = "raster")
+    
+  
+    nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3[, , 1]), col = "#ffff00")
+    
+    
+    
+    fr1 = computeFeatures(nuclei,     img3[,,1], xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
+    data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
+    
+    for(i in 1:dim(img3)[3]) {                             # Head of for-loop
+      
+      
+      new_col <- computeFeatures(nuclei,     img3[,,i], xname = "Frame_",
+                                 refnames = "fr_")                      # Creating new variable
+      data[ , i] <- new_col[,12]                     # Adding new variable to data
+      colnames(data)[i] <- paste0("", i)    # Renaming new variable
+    }
+    
+    
+    data.c <- cbind(Cell = c(1:dim(fr1)[1]), data)
+    
+    dat1.t <- t(data.c)
+    dat1.t.NoC <- dat1.t[-1,]
+    colnames(dat1.t.NoC) <- c(1:dim(dat1.t.NoC)[2])
+    data.t.c <- cbind(Time = c(1:dim(dat1.t.NoC)[1]), dat1.t.NoC)
+    rownames(data.t.c) <- NULL
+    dat1 <- data.t.c
+    
+    cl <- c("Time_Frame",paste0("Cell.0",1:9),paste0("Cell.",10:(dim(dat1)[2]-1)))
+    colnames(dat1) <- cl
+    dat1 <- as.data.frame.array(dat1)
+    
+    dat1.dt <- dat1                                                    #new dataframe for detrended ersults 
+    
+    for(i in 1:dim(dat1)[2]){                                          # run each Sample in a loop
+      dat1.dt[,i] <- detrend(dat1[,i], tt = 'linear', bp = c())       # detrend the data using linear model
+    }; dat1.dt[,1] <- dat1[,1] 
+    
+    
+    #################################################################
+    ### Find out the range of the data and set the minimum value to zero
+    drange <- data.frame(row.names = cl, "min" = apply(dat1.dt,2,min), "max" = apply(dat1.dt,2,max))
+    min.vals <- matrix(rep(drange$min, dim(dat1)[1]),  ncol=dim(dat1)[2], byrow=T)
+    dat1.dt.z <- dat1.dt-min.vals
+    drange.z <- data.frame(row.names = cl, "min" = apply(dat1.dt.z,2,min), "max" = apply(dat1.dt.z,2,max))
+    #################################################################
+    
+    
+    #################################################################
+    ####           detect peaks & smooth out the data            ####
+    #
+    # smoothing is needed because the raw data is very "spiky", this makes peak detection hard
+    # peak is defined as high intensity: normalized intensity > 2x sd &
+    # peak has >2 successive measurements increase before peak maximum &
+    # peak has >2 successive measurements decrease after peak maximum
+    smoothing.parameter <- 0.02                                     # Smooting parameter for lowess (larger values make smoothing rougher)
+    successive.points <- 3                                          # how many successive points need to increase or decrease
+    
+    dat1.peaks <- list()                                            # Peaks are stores in a list
+    dat1.dt.z.s <- dat1.dt.z                                        # The smoothed values go here
+    
+    for(i in 2:ncol(dat1.dt)){
+      tmp.data <- dat1.dt.z[,i]
+      noiselevel <- 2*sd(tmp.data)
+      tmp.data <- lowess(tmp.data, f=smoothing.parameter)$y
+      dat1.dt.z.s[,i] <- tmp.data
+      tmp <- findpeaks(tmp.data, nups=successive.points, ndowns=successive.points, minpeakheight=noiselevel )
+      if(is.null(tmp[,1])) { tmp <- matrix(NA,ncol=4) }
+      else { tmp <- tmp }
+      tmp <- data.frame("Intensity" = tmp[,1], "Peak.max"=tmp[,2], "Peak.start"=tmp[,4], "Peak.end"=tmp[,4], "Noiselevel" = noiselevel)
+      dat1.peaks[[i-1]] <- tmp
+    }; names(dat1.peaks) <- colnames(dat1.dt)[-1]
+    
     output$heat <- renderPlot({
-      img3 = readImage(files = input$files$datapath)
-      
-      # w = makeBrush(size = 101, shape = "gaussian", sigma = 7)
-      # tibble(w = w[(nrow(w)+1)/2, ])
-      # %>%
-      # ggplot(aes(y = w, x = seq(along = w))) + geom_point()
-      
-      #nucSmooth = filter2(getFrame(img3, 1), w)
-      
-      cellsSmooth = Image(dim = dim(img3))
-      
-      sigma <- rep (7, dim(img3)[3])
-      for(i in seq_along(sigma)) {
-        cellsSmooth[,,i] = filter2(
-          img3[,,i],
-          filter = makeBrush(size = 101, shape = "gaussian",
-                             sigma = sigma[i])
-        )
-      }
-      
-      disc = makeBrush(101, "disc")
-      disc = disc / sum(disc)
-      offset = 0.07
-      nucThresh = (cellsSmooth[,,1] - filter2( cellsSmooth[,,1], disc ) > offset)
-      
-      nucOpened = EBImage::opening(nucThresh, kern = makeBrush(3, shape = "disc"))
-      
-      nucSeed = bwlabel(nucOpened)
-      
-      nucMask = cellsSmooth[,, 1] - filter2(cellsSmooth[ , , 1], disc) > 0
-      nucMask = fillHull(nucMask)
-      nuclei = propagate(cellsSmooth[,,1], nucSeed, mask = nucMask)
-      #EBImage::display(nuclei,method = "raster")
-      
-      # bgPars = function(x) {
-      #   x    = log(x)
-      #   loc  = half.range.mode( x )
-      #   left = (x - loc)[ x < loc ]
-      #   wid  = sqrt( mean(left^2) )
-      #   c(loc = loc, wid = wid, thr = loc + 6*wid)
-      # }
-      # cellBg = apply(cellsSmooth, MARGIN = 3, FUN = bgPars)
-      # 
-      # cytoplasmMask = (cellsSmooth[,,2] > exp(cellBg["thr", 2])) |
-      #   nuclei | (cellsSmooth[,,3] > exp(cellBg["thr", 3]))
-      # 
-      # cellbodies = propagate(x = cellsSmooth[ , , 3], seeds = nuclei,
-      #                        lambda = 1.0e-2, mask = cytoplasmMask)
-      
-      nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3[, , 1]), col = "#ffff00")
-      
-      # cellsColor = rgbImage(red   = img3[,, 3],
-      #                       green = img3[,, 2],
-      #                       blue  = img3[,, 1])
-      # nucSegOnAll  = paintObjects(nuclei, tgt = cellsColor, col = "#ffff00")
-      # 
-      # cellSegOnAll = paintObjects(cellbodies, tgt = nucSegOnAll, col = "#ff0080")
       
       
-      fr1 = computeFeatures(nuclei,     img3[,,1], xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
-      data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
       
-      for(i in 1:dim(img3)[3]) {                             # Head of for-loop
-        
-        
-        new_col <- computeFeatures(nuclei,     img3[,,i], xname = "Frame_",
-                                   refnames = "fr_")                      # Creating new variable
-        data[ , i] <- new_col[,12]                     # Adding new variable to data
-        colnames(data)[i] <- paste0("", i)    # Renaming new variable
-      }
-      
-      
-      data.c <- cbind(Cell = c(1:dim(fr1)[1]), data)
-      
-      dat1.t <- t(data.c)
-      dat1.t.NoC <- dat1.t[-1,]
-      colnames(dat1.t.NoC) <- c(1:dim(dat1.t.NoC)[2])
-      data.t.c <- cbind(Time = c(1:dim(dat1.t.NoC)[1]), dat1.t.NoC)
-      rownames(data.t.c) <- NULL
-      dat1 <- data.t.c
-      
-      cl <- c("Time_Frame",paste0("Cell.0",1:9),paste0("Cell.",10:(dim(dat1)[2]-1)))
-      colnames(dat1) <- cl
-      dat1 <- as.data.frame.array(dat1)
-      
-      dat1.dt <- dat1                                                    #new dataframe for detrended ersults 
-      
-      for(i in 1:dim(dat1)[2]){                                          # run each Sample in a loop
-        dat1.dt[,i] <- detrend(dat1[,i], tt = 'linear', bp = c())       # detrend the data using linear model
-      }; dat1.dt[,1] <- dat1[,1] 
-      
-      
-      #################################################################
-      ### Find out the range of the data and set the minimum value to zero
-      drange <- data.frame(row.names = cl, "min" = apply(dat1.dt,2,min), "max" = apply(dat1.dt,2,max))
-      min.vals <- matrix(rep(drange$min, dim(dat1)[1]),  ncol=dim(dat1)[2], byrow=T)
-      dat1.dt.z <- dat1.dt-min.vals
-      drange.z <- data.frame(row.names = cl, "min" = apply(dat1.dt.z,2,min), "max" = apply(dat1.dt.z,2,max))
-      #################################################################
-      
-      
-      #################################################################
-      ####           detect peaks & smooth out the data            ####
-      #
-      # smoothing is needed because the raw data is very "spiky", this makes peak detection hard
-      # peak is defined as high intensity: normalized intensity > 2x sd &
-      # peak has >2 successive measurements increase before peak maximum &
-      # peak has >2 successive measurements decrease after peak maximum
-      smoothing.parameter <- 0.02                                     # Smooting parameter for lowess (larger values make smoothing rougher)
-      successive.points <- 3                                          # how many successive points need to increase or decrease
-      
-      dat1.peaks <- list()                                            # Peaks are stores in a list
-      dat1.dt.z.s <- dat1.dt.z                                        # The smoothed values go here
-      
-      for(i in 2:ncol(dat1.dt)){
-        tmp.data <- dat1.dt.z[,i]
-        noiselevel <- 2*sd(tmp.data)
-        tmp.data <- lowess(tmp.data, f=smoothing.parameter)$y
-        dat1.dt.z.s[,i] <- tmp.data
-        tmp <- findpeaks(tmp.data, nups=successive.points, ndowns=successive.points, minpeakheight=noiselevel )
-        if(is.null(tmp[,1])) { tmp <- matrix(NA,ncol=4) }
-        else { tmp <- tmp }
-        tmp <- data.frame("Intensity" = tmp[,1], "Peak.max"=tmp[,2], "Peak.start"=tmp[,4], "Peak.end"=tmp[,4], "Noiselevel" = noiselevel)
-        dat1.peaks[[i-1]] <- tmp
-      }; names(dat1.peaks) <- colnames(dat1.dt)[-1]
       
       
       #################################################################
@@ -377,35 +389,23 @@ server <- function(input, output) {
       cuts <- 3
       pheatmap(cor(dat1.dt.z[,-1]), margins=c(10,10), cutree_rows=cuts, cutree_cols=cuts)
       
-      # dataRN <- data 
-      # rownames(dataRN) <- c(paste0("Neuron_", 1:dim(fr1)[1])) # naming the rows in a new dataframe
-      # 
-      # tDataRN <- t(dataRN) # transpose matrix
-      # 
-      # p <- pheatmap(cor(tDataRN, use = "pairwise.complete.obs"), cutree_rows=3, cutree_cols=3, treeheight_row=0, treeheight_col=0)                     
-      # return(p)
-      
-      
+    
       
     } , height = 800, width = 800)
   })
   
   imgUploadedFrame1 <- reactive({
     
-    readImage(files = input$files$datapath)
+    img3 <- isolate(img3())
+    #readImage(files = input$files$datapath)
   })
   
   
   imgUploadedMask <- reactive({
     
-    img3 = readImage(files = input$files$datapath)
-    
-    # w = makeBrush(size = 101, shape = "gaussian", sigma = 7)
-    # tibble(w = w[(nrow(w)+1)/2, ])
-    # %>%
-    # ggplot(aes(y = w, x = seq(along = w))) + geom_point()
-    
-    #nucSmooth = filter2(getFrame(img3, 1), w)
+    img3 <- isolate(img3())
+    #img3 = readImage(files = input$files$datapath)
+   
     
     
     cellsSmooth = Image(dim = dim(img3)[1:2]) # create empty df to hold just one frame of the image stack
@@ -452,7 +452,8 @@ server <- function(input, output) {
   })
   
   tableInput <- reactive({
-    img3 = readImage(files = input$files$datapath)
+    img3 <- isolate(img3())
+    #img3 = readImage(files = input$files$datapath)
     
     
     cellsSmooth = Image(dim = dim(img3))
@@ -583,9 +584,7 @@ server <- function(input, output) {
   observeEvent(input$buildTable, {
     output$table = renderPrint({                      # create output for displaying a correlation table summary in UI
       tableInput()
-      
     
-      
     })
     
   })
@@ -613,10 +612,9 @@ server <- function(input, output) {
     if (input$addLabels==TRUE) {
       output$rasterMask <- renderPlot({
         plot(imgUploadedMask())
-        img3 = readImage(files = input$files$datapath)
         
-     
-        
+        img3 <- isolate(img3())
+        # img3 = readImage(files = input$files$datapath)
         
         
         cellsSmooth = Image(dim = dim(img3)[1:2]) # create empty df to hold just one frame of the image stack
