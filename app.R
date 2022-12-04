@@ -92,6 +92,19 @@ ui <- fluidPage(theme = shinytheme("paper"),
                                br(),
                                br(),
                                actionButton("addLabels", "Show Mask and Labels"), 
+                               br(),
+                               
+                               checkboxInput(inputId = "rmvCell",
+                                             label = "Remove cell(s) from the calculations?",
+                                             value = FALSE),
+                               conditionalPanel(
+                                 condition = "input.rmvCell == true",
+                                 tags$div(
+                                   HTML(paste("Add cell numbers separated by the coma. Start with the ", tags$span(style="color:blue", "highest cell number e.g. 41, 23, 1"), sep = ""))
+                                 ),
+                                 textInput("removeCell", "",  value = "1000")
+                               ),
+                               
                       ),
                       
                       tabPanel("Plot",
@@ -179,7 +192,18 @@ server <- function(input, output) {
     
   })
   
- 
+  numbersFromText <- function(text) {        # this functipon extracts numbers from text
+    text <- gsub(" ", "", text)
+    split <- strsplit(text, ",", fixed = FALSE)[[1]]
+    as.numeric(split)
+  }
+  
+  # exists_as_number <- function(item) {
+  #   !is.null(item) && !is.na(item)
+  # }
+  # 
+  
+  
   
   observeEvent(input$buildPlot, {
     output$plot <- renderPlot({
@@ -197,7 +221,7 @@ server <- function(input, output) {
       
       cellsSmooth = filter2(
         img3_F1,
-        filter = makeBrush(size = 101, shape = "gaussian",
+        filter = makeBrush(size = size, shape = "gaussian",
                            sigma=sigma)
       )
       
@@ -205,6 +229,7 @@ server <- function(input, output) {
       disc = disc / sum(disc)
       offset = input$offset
       rad <- input$rad
+      rmCell <- numbersFromText(input$removeCell)
       
       nucThresh = (cellsSmooth - filter2( cellsSmooth, disc ) > offset)
       
@@ -219,11 +244,14 @@ server <- function(input, output) {
     
       
       nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3_F1), col = "#ffff00")
-      
+      #EBImage::display(nucSegOnNuc,method = "raster")
       
       
       fr1 = computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
+      
+      
       data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
+      
       
       for(i in 1:dim(img3)[3]) {                             # Head of for-loop
         
@@ -232,6 +260,13 @@ server <- function(input, output) {
                                    refnames = "fr_")                      # Creating new variable
         data[ , i] <- new_col[,12]                     # Adding new variable to data
         colnames(data)[i] <- paste0("", i)    # Renaming new variable
+      }
+      
+      
+      if (input$rmvCell == T) {
+
+        data <- data[-rmCell, ]
+        data
       }
       
       ##++++++++++++++++++++++++++++ Detrending ++++++++++++++++++++++++++++++++++++++++###
@@ -252,7 +287,7 @@ server <- function(input, output) {
         }
         dat31 <- as.data.frame(dat31)
         
-        cn <- colnames(data) # for later use in the returning original column names
+        cn <- colnames(data) # for use in the next line for the returning original column names
         colnames(dat31) <- cn
         dataID <- dat31
         
@@ -265,14 +300,24 @@ server <- function(input, output) {
       #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++###
       
       else if (input$detrend == FALSE) {
-        dataID <- data
         
-        dataID <- cbind(cellID = c(1:dim(fr1)[1]), dataID)
+      
         
-        dataID <- dataID[,-1]
+        dat31 <- c()
+        for(i in 1:dim(data)[2]){
+          tmp <- data[,i] # fits a "moving" linear regression to the data and subracts the "time" component from the total intensities
+          dat31 <- cbind(dat31,tmp)
+        }
+        dat31 <- as.data.frame(dat31)
+        
+        cn <- colnames(data) # for use in the next line for the returning original column names
+        colnames(dat31) <- cn
+        dataID <- dat31
+        
+        # dataID <- cbind(cellID = c(1:dim(fr1)[1]), dataID)
+        # 
+        # dataID <- dataID[,-1]
         dataID$id = 1:nrow(dataID)
-        
-        #require(reshape2)
         dataMelt = melt(dataID, variable.name = "Frame", value.name = "Intensity", id.vars = "id")
       }
       
@@ -305,7 +350,7 @@ server <- function(input, output) {
       size <- input$size
       cellsSmooth = filter2(
         img3_F1,
-        filter = makeBrush(size = 101, shape = "gaussian",
+        filter = makeBrush(size = size, shape = "gaussian",
                            sigma=sigma)
       )
       
@@ -313,6 +358,7 @@ server <- function(input, output) {
       disc = disc / sum(disc)
       offset = input$offset
       rad <- input$rad
+      rmCell <- numbersFromText(input$removeCell)
       
       nucThresh = (cellsSmooth - filter2( cellsSmooth, disc ) > offset)
       
@@ -342,8 +388,15 @@ server <- function(input, output) {
         colnames(data)[i] <- paste0("", i)    # Renaming new variable
       }
       
+     
       
       data.c <- cbind(Cell = c(1:dim(fr1)[1]), data)
+      
+      if (input$rmvCell == T) {
+        
+        data.c <- data.c[-rmCell, ]
+        data.c
+      }
       
       dat1.t <- t(data.c)
       dat1.t.NoC <- dat1.t[-1,]
@@ -445,7 +498,7 @@ server <- function(input, output) {
     
     cellsSmooth = filter2(
       img3_F1,
-      filter = makeBrush(size = 101, shape = "gaussian",
+      filter = makeBrush(size = size, shape = "gaussian",
                          sigma=sigma)
     )
     
@@ -486,7 +539,7 @@ server <- function(input, output) {
     
     cellsSmooth = filter2(
       img3_F1,
-      filter = makeBrush(size = 101, shape = "gaussian",
+      filter = makeBrush(size = size, shape = "gaussian",
                          sigma=sigma)
     )
     
@@ -494,6 +547,7 @@ server <- function(input, output) {
     disc = disc / sum(disc)
     offset = input$offset
     rad <- input$rad
+    rmCell <- numbersFromText(input$removeCell)
     
     nucThresh = (cellsSmooth - filter2(cellsSmooth, disc ) > offset)
     
@@ -510,6 +564,7 @@ server <- function(input, output) {
     nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3_F1), col = "#ffff00")
     
     fts = computeFeatures.moment(nuclei)
+  
     
     fr1 = computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
     data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
@@ -525,6 +580,13 @@ server <- function(input, output) {
     
     
     data.c <- cbind(Cell = c(1:dim(fr1)[1]), data)
+    
+    
+    if (input$rmvCell == T) {
+      
+      data.c <- data.c[-rmCell, ]
+      data.c
+    }
     
     dat1.t <- t(data.c)
     dat1.t.NoC <- dat1.t[-1,]
@@ -656,7 +718,7 @@ server <- function(input, output) {
         
         cellsSmooth = filter2(
           img3_F1,
-          filter = makeBrush(size = 101, shape = "gaussian",
+          filter = makeBrush(size = size, shape = "gaussian",
                              sigma=sigma)
         )
         
@@ -664,6 +726,7 @@ server <- function(input, output) {
         disc = disc / sum(disc)
         offset = input$offset
         rad <- input$rad
+        rmCell <- numbersFromText(input$removeCell)
         
         nucThresh = (cellsSmooth - filter2(cellsSmooth, disc ) > offset)
         
@@ -677,11 +740,24 @@ server <- function(input, output) {
         #EBImage::display(nuclei,method = "raster")
         
         nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3_F1), col = "#ffff00")
+        
+        #EBImage::display(nucSegOnNuc,method = "raster")
+        
         fts = computeFeatures.moment(nuclei)
         
-        text(fts[,"m.cx"], fts[,"m.cy"], labels=seq_len(nrow(fts)), col="white", cex=.8)
+        #if(is.na(rmCell)) return(NULL) 
+        if (input$rmvCell == T) {
+             
+            fts <- fts[-rmCell, ]
+            fts
+                                }
+        
+        text(fts[,"m.cx"], fts[,"m.cy"], labels=seq_len(nrow(fts)), col="red", cex=1)
+        
         
       }, height = 512, width = 512)
+      
+     
     }
     
     else if (input$addLabels==FALSE) {
