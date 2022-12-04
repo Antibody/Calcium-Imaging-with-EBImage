@@ -17,7 +17,7 @@ options(repos = BiocManager::repositories())
 knitr::opts_chunk$set(echo = TRUE)
 
 ui <- fluidPage(theme = shinytheme("paper"),
-                titlePanel(h6("Calcium Imaging v.0.1.2")),
+                titlePanel(h6("Calcium Imaging v.0.1.3")),
                 
                 #++++++++++++CSS for notifications +++++++++++++++
                 tags$head(
@@ -47,7 +47,7 @@ ui <- fluidPage(theme = shinytheme("paper"),
                       numericInput(
                         inputId="sigma",
                         label="Image blurring (sigma)",
-                        value=3,
+                        value=7,
                         min = 1,
                         max = 111,
                         step = 2
@@ -57,18 +57,18 @@ ui <- fluidPage(theme = shinytheme("paper"),
                       numericInput(
                         inputId="size",
                         label="Size (px)",
-                        value=51,
+                        value=101,
                         min = 1,
                         max = 1011,
                         step = 2
                       ),
                       
-                      sliderInput("offset", h6("offset"), 0, 1, 0.05),
+                      sliderInput("offset", h6("offset"), 0, 1, 0.07),
                       
                       numericInput(
                         inputId="rad",
                         label="masking radius",
-                        value=3,
+                        value=9,
                         min = 1,
                         max = 111,
                         step = 2
@@ -114,7 +114,10 @@ ui <- fluidPage(theme = shinytheme("paper"),
                                              label = "Detrend my data",
                                              value = FALSE),
                                br(),
-                               plotOutput("plot", height = "100%")
+                               plotOutput("plot", height = "100%"),
+                               
+                               br(),
+                               downloadButton("downloadPlotData", "Download data"),
                                
                                
                       ),
@@ -335,6 +338,121 @@ server <- function(input, output) {
     } , height = 800, width = 1200)
   })
   
+  ############# preparing a table for downloading plot data ################
+  tablePlotData <- reactive({
+    img3 = readImage(files = input$files$datapath)
+    img3_F1 = readImage((files = input$files$datapath)[1]) # first frame only
+ 
+    img3 <- resize(img3, 512, 512)
+    img3_F1 <- resize(img3_F1, 512, 512)
+    
+    
+    cellsSmooth = Image(dim = dim(img3_F1))
+    
+    sigma <- input$sigma
+    size <- input$size
+    
+    cellsSmooth = filter2(
+      img3_F1,
+      filter = makeBrush(size = size, shape = "gaussian",
+                         sigma=sigma)
+    )
+    
+    disc = makeBrush(size, "disc")
+    disc = disc / sum(disc)
+    offset = input$offset
+    rad <- input$rad
+    rmCell <- numbersFromText(input$removeCell)
+    
+    nucThresh = (cellsSmooth - filter2( cellsSmooth, disc ) > offset)
+    
+    nucOpened = EBImage::opening(nucThresh, kern = makeBrush(rad, shape = "disc"))
+    
+    nucSeed = bwlabel(nucOpened)
+    
+    nucMask = cellsSmooth - filter2(cellsSmooth, disc) > 0
+    nucMask = fillHull(nucMask)
+    nuclei = propagate(cellsSmooth, nucSeed, mask = nucMask)
+    #EBImage::display(nuclei,method = "raster")
+    
+    
+    nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3_F1), col = "#ffff00")
+    #EBImage::display(nucSegOnNuc,method = "raster")
+    
+    
+    fr1 = computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
+    
+    
+    data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
+    
+    
+    for(i in 1:dim(img3)[3]) {                             # Head of for-loop
+      
+      
+      new_col <- computeFeatures(nuclei,     img3[,,i], xname = "Frame_",
+                                 refnames = "fr_")                      # Creating new variable
+      data[ , i] <- new_col[,12]                     # Adding new variable to data
+      colnames(data)[i] <- paste0("Frame_", i)    # Renaming new variable
+    }
+    
+    
+    if (input$rmvCell == T) {
+      
+      data <- data[-rmCell, ]
+      data
+    }
+    
+    ##++++++++++++++++++++++++++++ Detrending ++++++++++++++++++++++++++++++++++++++++###
+    if (input$detrend == TRUE) {
+      
+      #cn <- colnames(data) # for later use in the returning original column names
+      
+      #library(pracma)
+      
+      # br <- 4                                                        # You can try different break points
+      # break.points <- seq(from=br,to=dim(data)[1], by=br)
+      # data.dt <- data                                                 # create a duplicate data frame
+      
+      dat31 <- c()
+      for(i in 1:dim(data)[2]){
+        tmp <- detrend(data[,i], tt = 'linear', bp = c()) # fits a "moving" linear regression to the data and subracts the "time" component from the total intensities
+        dat31 <- cbind(dat31,tmp)
+      }
+      dat31 <- as.data.frame(dat31)
+      
+      cn <- colnames(data) # for use in the next line for the returning original column names
+      colnames(dat31) <- cn
+      dataID <- dat31
+      
+      dataID$Cell_number = 1:nrow(dataID)
+      dataID
+    }
+    #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++###
+    
+    else if (input$detrend == FALSE) {
+      
+      
+      
+      dat31 <- c()
+      for(i in 1:dim(data)[2]){
+        tmp <- data[,i] # fits a "moving" linear regression to the data and subracts the "time" component from the total intensities
+        dat31 <- cbind(dat31,tmp)
+      }
+      dat31 <- as.data.frame(dat31)
+      
+      cn <- colnames(data) # for use in the next line for the returning original column names
+      colnames(dat31) <- cn
+      dataID <- dat31
+      
+      
+      dataID$Cell_number = 1:nrow(dataID)
+      dataID
+      
+    }
+    
+    
+                            })
+  ############################## build correlation HEATMAP #############################
   observeEvent(input$buildHeat, {
     output$heat <- renderPlot({
       img3 = readImage(files = input$files$datapath)
@@ -681,6 +799,18 @@ server <- function(input, output) {
     })
     
   })
+  
+  
+  
+  output$downloadPlotData <- downloadHandler(
+    
+    
+    filename = 'Calcium_traces.csv',
+    
+    content = function(file) {
+      write.csv(tablePlotData(), file, row.names = FALSE)
+      #dev.off()
+    }              )
   
   
   output$downloadTable <- downloadHandler(
