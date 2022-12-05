@@ -113,6 +113,9 @@ ui <- fluidPage(theme = shinytheme("paper"),
                                checkboxInput(inputId = "detrend",
                                              label = "Detrend my data",
                                              value = FALSE),
+                               checkboxInput(inputId = "subtract",
+                                             label = "Subtract background",
+                                             value = FALSE),
                                br(),
                                plotOutput("plot", height = "100%"),
                                
@@ -253,17 +256,53 @@ server <- function(input, output) {
       fr1 = computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
       
       
-      data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
-      
-      
-      for(i in 1:dim(img3)[3]) {                             # Head of for-loop
+      ########################################################################################
+      ################# background correction ################################################
+      if (input$subtract == T) {
         
         
-        new_col <- computeFeatures(nuclei,     img3[,,i], xname = "Frame_",
-                                   refnames = "fr_")                      # Creating new variable
-        data[ , i] <- new_col[,12]                     # Adding new variable to data
-        colnames(data)[i] <- paste0("", i)    # Renaming new variable
+        data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
+        
+        
+        for(i in 1:dim(img3)[3]) {                             # Head of for-loop
+          
+          
+          new_col <- computeFeatures(nuclei,     img3[,,i], xname = "",   
+                                     refnames = "fr_")                      # Creating new variable
+          data[ , i] <- new_col[,12]                     # Adding new variable to data
+          colnames(data)[i] <- paste0("", i)    # Renaming new variable
+        }
+        
+        whiteImg <- matrix(1, dim(img3_F1), dim(img3_F1)) # create an array of 1s, which will be rendered white
+        
+        bkg <- whiteImg - nuclei #subtract cells masks from white image to get a mask o a background
+        
+        #display(bkg, "raster")
+        
+        bkg_computed = computeFeatures(bkg,  img3_F1, xname = "Cells",  refnames = "c1") #
+        
+        data_bkg_subtracted <- data - bkg_computed[, 12]
+        
+        data <- data_bkg_subtracted
       }
+      
+      ###################### If background subtraction is NOT checked ###############################################
+      
+      if (input$subtract == F) {
+        data <- data.frame(col1 = rep(NA, dim(fr1)[1]))       # Creating a new placeholder dataframe with number of rows calulated by: computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1")
+        
+        
+        for(i in 1:dim(img3)[3]) {                             # Head of for-loop
+          
+          # new dataframe with ROI calculations over entire image stack
+          new_col <- computeFeatures(nuclei,     img3[,,i], xname = "P",   # xname for naming the first name of various parameters columns
+                                     refnames = "fr_")                      # Creating new variable
+          data[ , i] <- new_col[,12]                     # Adding column with intensities [12] to a new dataframe
+          colnames(data)[i] <- paste0("", i)    # Renaming new variable
+        }
+      }
+      
+      ###################### remove unvanted cells ###############################################
       
       
       if (input$rmvCell == T) {
@@ -337,7 +376,7 @@ server <- function(input, output) {
       
     } , height = 800, width = 1200)
   })
-  
+ ############################################################################ 
   ############# preparing a table for downloading plot data ################
   tablePlotData <- reactive({
     img3 = readImage(files = input$files$datapath)
@@ -383,17 +422,53 @@ server <- function(input, output) {
     fr1 = computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
     
     
-    data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
-    
-    
-    for(i in 1:dim(img3)[3]) {                             # Head of for-loop
+    ########################################################################################
+    ################# background correction ################################################
+    if (input$subtract == T) {
       
       
-      new_col <- computeFeatures(nuclei,     img3[,,i], xname = "Frame_",
-                                 refnames = "fr_")                      # Creating new variable
-      data[ , i] <- new_col[,12]                     # Adding new variable to data
-      colnames(data)[i] <- paste0("Frame_", i)    # Renaming new variable
+      data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
+      
+      
+      for(i in 1:dim(img3)[3]) {                             # Head of for-loop
+        
+        
+        new_col <- computeFeatures(nuclei,     img3[,,i], xname = "",   
+                                   refnames = "fr_")                      # Creating new variable
+        data[ , i] <- new_col[,12]                     # Adding new variable to data
+        colnames(data)[i] <- paste0("", i)    # Renaming new variable
+      }
+      
+      whiteImg <- matrix(1, dim(img3_F1), dim(img3_F1)) # create an array of 1s, which will be rendered white
+      
+      bkg <- whiteImg - nuclei #subtract cells masks from white image to get a mask o a background
+      
+      #display(bkg, "raster")
+      
+      bkg_computed = computeFeatures(bkg,  img3_F1, xname = "Cells",  refnames = "c1") #
+      
+      data_bkg_subtracted <- data - bkg_computed[, 12]
+      
+      data <- data_bkg_subtracted
     }
+    
+    ###################### If background subtraction is NOT checked ###############################################
+    
+    if (input$subtract == F) {
+      data <- data.frame(col1 = rep(NA, dim(fr1)[1]))       # Creating a new placeholder dataframe with number of rows calulated by: computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1")
+      
+      
+      for(i in 1:dim(img3)[3]) {                             # Head of for-loop
+        
+        # new dataframe with ROI calculations over entire image stack
+        new_col <- computeFeatures(nuclei,     img3[,,i], xname = "P",   # xname for naming the first name of various parameters columns
+                                   refnames = "fr_")                      # Creating new variable
+        data[ , i] <- new_col[,12]                     # Adding column with intensities [12] to a new dataframe
+        colnames(data)[i] <- paste0("", i)    # Renaming new variable
+      }
+    }
+    
+    ###################### remove unvanted cells ###############################################
     
     
     if (input$rmvCell == T) {
@@ -452,6 +527,8 @@ server <- function(input, output) {
     
     
                             })
+  
+  #####################################################################################
   ############################## build correlation HEATMAP #############################
   observeEvent(input$buildHeat, {
     output$heat <- renderPlot({
