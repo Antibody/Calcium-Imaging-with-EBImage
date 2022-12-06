@@ -279,11 +279,23 @@ server <- function(input, output) {
         
         #display(bkg, "raster")
         
-        bkg_computed = computeFeatures(bkg,  img3_F1, xname = "Cells",  refnames = "c1") #
+        data_bkg <- data.frame(col1 = rep(NA, 1))
         
-        data_bkg_subtracted <- data - bkg_computed[, 12]
         
-        data <- data_bkg_subtracted
+        
+        for(i in 1:dim(img3)[3]) {                             # A for-loop to create a vector with background intensities timeline
+          
+          
+          new_col <- computeFeatures(bkg,     img3[,,i], xname = "",   
+                                     refnames = "fr_")                      # Creating new column for each cell
+          data_bkg[ , i] <- new_col[,12]                     # Adding new columns with next timeframe data to a DF
+          # colnames(data_bkg)[i] <- paste0("", i)    # Adding a first letter to column names (currently empty)
+        }
+        
+        data_subtr <- sweep(as.matrix(data), MARGIN = 2, as.matrix(data_bkg)) # use SWEEP function to subtract a vector (has to be converted 
+        # to a matrix to work with sweep) with background from data DF (also as a matrix) row by row (this is why I use "MARGIN=2") 
+        
+        data <- as.data.frame(data_subtr)
       }
       
       ###################### If background subtraction is NOT checked ###############################################
@@ -436,8 +448,8 @@ server <- function(input, output) {
         new_col <- computeFeatures(nuclei,     img3[,,i], xname = "",   
                                    refnames = "fr_")                      # Creating new variable
         data[ , i] <- new_col[,12]                     # Adding new variable to data
-        colnames(data)[i] <- paste0("", i)    # Renaming new variable
-      }
+        colnames(data)[i] <- paste0("Frame_", i)    # Renaming new variable
+                               }
       
       whiteImg <- matrix(1, dim(img3_F1), dim(img3_F1)) # create an array of 1s, which will be rendered white
       
@@ -445,12 +457,25 @@ server <- function(input, output) {
       
       #display(bkg, "raster")
       
-      bkg_computed = computeFeatures(bkg,  img3_F1, xname = "Cells",  refnames = "c1") #
+      data_bkg <- data.frame(col1 = rep(NA, 1))
       
-      data_bkg_subtracted <- data - bkg_computed[, 12]
       
-      data <- data_bkg_subtracted
-    }
+      
+      for(i in 1:dim(img3)[3]) {                             # A for-loop to create a vector with background intensities timeline
+        
+        
+        new_col <- computeFeatures(bkg,     img3[,,i], xname = "",   
+                                   refnames = "fr_")                      # Creating new variable
+        data_bkg[ , i] <- new_col[,12]                     # Adding new columns with next timeframe data to a data
+        colnames(data_bkg)[i] <- paste0("Frame_", i)    # Renaming new variable
+                                 }
+      
+      data_subtr <- sweep(as.matrix(data), MARGIN = 2, as.matrix(data_bkg)) # use SWEEP function to subtract a vector (has to be converted 
+      # to a matrix to work with sweep) with background from data DF (also as a matrix) row by row (this is why I use "MARGIN=2") 
+      
+      data <- as.data.frame(data_subtr)
+      
+                                   }
     
     ###################### If background subtraction is NOT checked ###############################################
     
@@ -464,7 +489,7 @@ server <- function(input, output) {
         new_col <- computeFeatures(nuclei,     img3[,,i], xname = "P",   # xname for naming the first name of various parameters columns
                                    refnames = "fr_")                      # Creating new variable
         data[ , i] <- new_col[,12]                     # Adding column with intensities [12] to a new dataframe
-        colnames(data)[i] <- paste0("", i)    # Renaming new variable
+        colnames(data)[i] <- paste0("Frame_", i)    # Renaming new variable
       }
     }
     
@@ -500,6 +525,30 @@ server <- function(input, output) {
       dataID <- dat31
       
       dataID$Cell_number = 1:nrow(dataID)
+      
+      ############### recalculate background for download
+      whiteImg <- matrix(1, dim(img3_F1), dim(img3_F1)) # create an array of 1s, which will be rendered white
+      
+      bkg <- whiteImg - nuclei #subtract cells masks from white image to get a mask of a background
+      
+      #display(bkg, "raster")
+      
+      data_bkg <- data.frame(col1 = rep(NA, 1))
+      
+      
+      
+      for(i in 1:dim(img3)[3]) {                             # A for-loop to create a vector with background intensities timeline
+        
+        
+        new_col <- computeFeatures(bkg,     img3[,,i], xname = "",   
+                                   refnames = "fr_")                      # Creating new variable
+        data_bkg[ , i] <- new_col[,12]                     # Adding new columns with next timeframe data to a data
+        colnames(data_bkg)[i] <- paste0("Frame_", i)    # Renaming new variable
+      }
+      
+      ####### add last row to the DF with background
+      data_bkg$bkg <- "background"
+      dataID[dim(dataID)[1]+1, ] <- data_bkg[1, ]
       dataID
     }
     #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++###
@@ -521,7 +570,32 @@ server <- function(input, output) {
       
       
       dataID$Cell_number = 1:nrow(dataID)
+      ############### recalculate background for download
+      whiteImg <- matrix(1, dim(img3_F1), dim(img3_F1)) # create an array of 1s, which will be rendered white
+      
+      bkg <- whiteImg - nuclei #subtract cells masks from white image to get a mask of a background
+      
+      #display(bkg, "raster")
+      
+      data_bkg <- data.frame(col1 = rep(NA, 1))
+      
+      
+      
+      for(i in 1:dim(img3)[3]) {                             # A for-loop to create a vector with background intensities timeline
+        
+        
+        new_col <- computeFeatures(bkg,     img3[,,i], xname = "",   
+                                   refnames = "fr_")                      # Creating new variable
+        data_bkg[ , i] <- new_col[,12]                     # Adding new columns with next timeframe data to a data
+        colnames(data_bkg)[i] <- paste0("Frame_", i)    # Renaming new variable
+      }
+      
+      ####### add last row to the DF with background
+      
+      data_bkg$bkg <- "background"
+      dataID[dim(dataID)[1]+1, ] <- data_bkg[1, ]
       dataID
+      
       
     }
     
