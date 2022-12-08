@@ -830,9 +830,9 @@ server <- function(input, output) {
     
    
     
-    nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3_F1), col = "#ffff00")
+    #nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3_F1), col = "#ffff00")
     
-    fts = computeFeatures.moment(nuclei)
+    #fts = computeFeatures.moment(nuclei)
   
     
     fr1 = computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
@@ -945,8 +945,153 @@ server <- function(input, output) {
   
   observeEvent(input$buildTable, {
     output$table = renderPrint({                      # create output for displaying a correlation table summary in UI
+      tableInput <- reactive({
+        img3 = readImage(files = input$files$datapath)
+        img3_F1 = readImage((files = input$files$datapath)[1]) # first frame only
+        img3 <- resize(img3, 512, 512)
+        img3_F1 <- resize(img3_F1, 512, 512)
+        cellsSmooth = Image(dim = dim(img3_F1))
+        
+        sigma <- input$sigma
+        size <- input$size
+        
+        cellsSmooth = filter2(
+          img3_F1,
+          filter = makeBrush(size = size, shape = "gaussian",
+                             sigma=sigma)
+        )
+        
+        disc = makeBrush(size, "disc")
+        disc = disc / sum(disc)
+        offset = input$offset
+        rad <- input$rad
+        rmCell <- numbersFromText(input$removeCell)
+        
+        nucThresh = (cellsSmooth - filter2(cellsSmooth, disc ) > offset)
+        
+        nucOpened = EBImage::opening(nucThresh, kern = makeBrush(rad, shape = "disc"))
+        
+        nucSeed = bwlabel(nucOpened)
+        
+        nucMask = cellsSmooth - filter2(cellsSmooth, disc) > 0
+        nucMask = fillHull(nucMask)
+        nuclei = propagate(cellsSmooth, nucSeed, mask = nucMask)
+        
+        
+        
+        #nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3_F1), col = "#ffff00")
+        
+        #fts = computeFeatures.moment(nuclei)
+        
+        
+        fr1 = computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
+        data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
+        
+        for(i in 1:dim(img3)[3]) {                             # Head of for-loop
+          
+          
+          new_col <- computeFeatures(nuclei,     img3[,,i], xname = "Frame_",
+                                     refnames = "fr_")                      # Creating new variable
+          data[ , i] <- new_col[,12]                     # Adding new variable to data
+          colnames(data)[i] <- paste0("", i)    # Renaming new variable
+        }
+        
+        
+        data.c <- cbind(Cell = c(1:dim(fr1)[1]), data)
+        
+        
+        if (input$rmvCell == T) {
+          
+          data.c <- data.c[-rmCell, ]
+          data.c
+        }
+        
+        dat1.t <- t(data.c)
+        dat1.t.NoC <- dat1.t[-1,]
+        colnames(dat1.t.NoC) <- c(1:dim(dat1.t.NoC)[2])
+        data.t.c <- cbind(Time = c(1:dim(dat1.t.NoC)[1]), dat1.t.NoC)
+        rownames(data.t.c) <- NULL
+        dat1 <- data.t.c
+        
+        cl <- c("Time_Frame",paste0("Cell.0",1:9),paste0("Cell.",10:(dim(dat1)[2]-1)))
+        colnames(dat1) <- cl
+        dat1 <- as.data.frame.array(dat1)
+        
+        dat1.dt <- dat1                                                    #new dataframe for detrended ersults
+        
+        for(i in 1:dim(dat1)[2]){                                          # run each Sample in a loop
+          dat1.dt[,i] <- detrend(dat1[,i], tt = 'linear', bp = c())       # detrend the data using linear model
+        }; dat1.dt[,1] <- dat1[,1]
+        
+        
+        ### Find out the range of the data and set the minimum value to zero
+        drange <- data.frame(row.names = cl, "min" = apply(dat1.dt,2,min), "max" = apply(dat1.dt,2,max))
+        min.vals <- matrix(rep(drange$min, dim(dat1)[1]),  ncol=dim(dat1)[2], byrow=T)
+        dat1.dt.z <- dat1.dt-min.vals
+        drange.z <- data.frame(row.names = cl, "min" = apply(dat1.dt.z,2,min), "max" = apply(dat1.dt.z,2,max))
+        #################################################################
+        
+        
+        #################################################################
+        ####           detect peaks & smooth out the data            ####
+        #
+        # smoothing is needed because the raw data is very "spiky", this makes peak detection hard
+        # peak is defined as high intensity: normalized intensity > 2x sd &
+        # peak has >2 successive measurements increase before peak maximum &
+        # peak has >2 successive measurements decrease after peak maximum
+        smoothing.parameter <- 0.02                                     # Smooting parameter for lowess (larger values make smoothing rougher)
+        successive.points <- 3                                          # how many successive points need to increase or decrease
+        
+        dat1.peaks <- list()                                            # Peaks are stores in a list
+        dat1.dt.z.s <- dat1.dt.z                                        # The smoothed values go here
+        
+        for(i in 2:ncol(dat1.dt)){
+          tmp.data <- dat1.dt.z[,i]
+          noiselevel <- 2*sd(tmp.data)
+          tmp.data <- lowess(tmp.data, f=smoothing.parameter)$y
+          dat1.dt.z.s[,i] <- tmp.data
+          tmp <- findpeaks(tmp.data, nups=successive.points, ndowns=successive.points, minpeakheight=noiselevel )
+          if(is.null(tmp[,1])) { tmp <- matrix(NA,ncol=4) }
+          else { tmp <- tmp }
+          tmp <- data.frame("Intensity" = tmp[,1], "Peak.max"=tmp[,2], "Peak.start"=tmp[,4], "Peak.end"=tmp[,4], "Noiselevel" = noiselevel)
+          dat1.peaks[[i-1]] <- tmp
+        }; names(dat1.peaks) <- colnames(dat1.dt)[-1]
+        
+        ####################################################################
+        ################ correlation table summary generation ##
+        
+        pairwise.combn <- t(combn(2:dim(dat1)[2],2))
+        
+        p.val <- c()
+        rq <- c()
+        cors <- c()
+        for(i in 1:dim(pairwise.combn)[1]){
+          lm1 <- summary(lm(dat1.dt.z[,pairwise.combn[i,1]] ~ dat1.dt.z[,pairwise.combn[i,2]] ))
+          p.val <- c(p.val,lm1$coefficients[2,4])
+          rq <- c(rq,lm1$r.squared)
+          cors <- c(cors,cor(dat1.dt.z[,pairwise.combn[i,1]] , dat1.dt.z[,pairwise.combn[i,2]] ))
+        }
+        
+        comb <- data.frame("X" = colnames(dat1)[pairwise.combn[,1]],
+                           "Y" = colnames(dat1)[pairwise.combn[,2]],
+                           "correlation" = cors,
+                           "R-squared" = rq,
+                           "P.value" = p.val)
+        comb$Adj.P.Value <- p.adjust(comb$P.value)
+        
+        cat("Number of correlating pairs with adj. p-value<", input$adjPval, "& correlation>", input$corr, "::",
+            length(comb[comb$Adj.P.Value<input$adjPval&comb$correlation>input$corr, 1]), "\n",
+            "Percentage of correlating pairs, of all possible pairs:", 
+            length(comb[comb$Adj.P.Value<input$adjPval&comb$correlation>input$corr, 1])*100/length(comb$X), "%", "\n")
+        
+        
+        cat("Correlation table filtered by adj. p-value<", input$adjPval, "& correlation>", input$corr, ":", "\n")
+        print(comb[comb$Adj.P.Value<input$adjPval&comb$correlation>input$corr,]  )
+        
+        #comb[comb$Adj.P.Value<0.01&comb$correlation>0.8,]
+        
+      })
       tableInput()
-      
     })
     
   })
