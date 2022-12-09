@@ -159,58 +159,28 @@ server <- function(input, output) {
     files <- input$files
     files$datapath <- gsub("\\\\", "/", files$datapath)
     files
-    
-    
-  })
+                   })
   
-  
-  output$images <- renderUI({
-    if(is.null(input$files)) return(NULL)
-    image_output_list <- 
-      lapply(1:nrow(files()),
-             function(i)
-             {
-               imagename = paste0("image", i)
-               imageOutput(imagename)
-             })
-    
-    do.call(tagList, image_output_list)
-  })
-  
-  observe({
-    if(is.null(input$files)) return(NULL)
-    for (i in 1:nrow(files()))
-    {
-      print(i)
-      local({
-        my_i <- i
-        imagename = paste0("image", my_i)
-        print(imagename)
-        output[[imagename]] <- 
-          renderImage({
-            list(src = files()$datapath[my_i],
-                 alt = "Image failed to render")
-          }, deleteFile = FALSE)
-       
-      })
-      
-    }
-    
-  })
-  
-  numbersFromText <- function(text) {        # this functipon extracts numbers from text
+#+++++++++++++++++++++++++ This function extracts numbers from text +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++#
+  numbersFromText <- function(text) {        # this function extracts numbers from text e.g. for the removal of unwanted cells
     text <- gsub(" ", "", text)
     split <- strsplit(text, ",", fixed = FALSE)[[1]]
     as.numeric(split)
-  }
-  
-  # exists_as_number <- function(item) {
-  #   !is.null(item) && !is.na(item)
-  # }
-  # 
+                                     }
   
   
+  #+++++++++++++++++++++++ send message about subtract function ++++++++++++++++++++++++++#
   
+  observeEvent(input$subtract , {
+    if (input$subtract==TRUE)  {
+      showNotification("Background is calculated from all of the area that is considered as non-cells. It also adds background values as the last line in the downlodable report table", duration = 10, type = "message")
+                                }                                      
+                                 })
+  
+  ##########################################################################################################
+  ################# Build Plot #############################################################################
+  
+
   observeEvent(input$buildPlot, {
     output$plot <- renderPlot({
       img3 = readImage(files = input$files$datapath)
@@ -314,7 +284,7 @@ server <- function(input, output) {
         }
       }
       
-      ###################### remove unvanted cells ###############################################
+      ###################### remove unwanted cells ###############################################
       
       
       if (input$rmvCell == T) {
@@ -325,14 +295,7 @@ server <- function(input, output) {
       
       ##++++++++++++++++++++++++++++ Detrending ++++++++++++++++++++++++++++++++++++++++###
       if (input$detrend == TRUE) {
-        
-        #cn <- colnames(data) # for later use in the returning original column names
-        
-        #library(pracma)
-        
-        # br <- 4                                                        # You can try different break points
-        # break.points <- seq(from=br,to=dim(data)[1], by=br)
-        # data.dt <- data                                                 # create a duplicate data frame
+      
         
         dat31 <- c()
         for(i in 1:dim(data)[2]){
@@ -341,13 +304,10 @@ server <- function(input, output) {
         }
         dat31 <- as.data.frame(dat31)
         
-        cn <- colnames(data) # for use in the next line for the returning original column names
-        colnames(dat31) <- cn
-        dataID <- dat31
+        colnames(dat31) <- colnames(data) # this line is for the returning original column names
         
-        # dataID <- cbind(cellID = c(1:dim(fr1)[1]), dataID)
-        # 
-        # dataID <- dataID[,-1]
+        dataID <- dat31
+      
         dataID$id = 1:nrow(dataID)
         dataMelt = melt(dataID, variable.name = "Frame", value.name = "Intensity", id.vars = "id")
       }
@@ -364,8 +324,7 @@ server <- function(input, output) {
         }
         dat31 <- as.data.frame(dat31)
         
-        cn <- colnames(data) # for use in the next line for the returning original column names
-        colnames(dat31) <- cn
+        colnames(dat31) <- colnames(data) # this line is for the returning original column names
         dataID <- dat31
         
         # dataID <- cbind(cellID = c(1:dim(fr1)[1]), dataID)
@@ -431,7 +390,7 @@ server <- function(input, output) {
     #EBImage::display(nucSegOnNuc,method = "raster")
     
     
-    fr1 = computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
+    fr1 = computeFeatures(nuclei,     img3_F1, xname = "Frame_",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
     
     
     ########################################################################################
@@ -453,9 +412,7 @@ server <- function(input, output) {
       
       whiteImg <- matrix(1, dim(img3_F1), dim(img3_F1)) # create an array of 1s, which will be rendered white
       
-      bkg <- whiteImg - nuclei #subtract cells masks from white image to get a mask o a background
-      
-      #display(bkg, "raster")
+      bkg <- whiteImg - nuclei #subtract cells masks from white image to get a mask of a background
       
       data_bkg <- data.frame(col1 = rep(NA, 1))
       
@@ -470,10 +427,10 @@ server <- function(input, output) {
         colnames(data_bkg)[i] <- paste0("Frame_", i)    # Renaming new variable
                                  }
       
-      data_subtr <- sweep(as.matrix(data), MARGIN = 2, as.matrix(data_bkg)) # use SWEEP function to subtract a vector (has to be converted 
+      data_subtr <- sweep(as.matrix(data), MARGIN = 2, as.matrix(data_bkg)) # SWEEP function subtracts a vector (has to be converted 
       # to a matrix to work with sweep) with background from data DF (also as a matrix) row by row (this is why I use "MARGIN=2") 
       
-      data <- as.data.frame(data_subtr)
+      data <- as.data.frame(data_subtr) #convert matrix back into a DF
       
                                    }
     
@@ -491,9 +448,10 @@ server <- function(input, output) {
         data[ , i] <- new_col[,12]                     # Adding column with intensities [12] to a new dataframe
         colnames(data)[i] <- paste0("Frame_", i)    # Renaming new variable
       }
+      data
     }
     
-    ###################### remove unvanted cells ###############################################
+    ###################### remove unwanted cells ###############################################
     
     
     if (input$rmvCell == T) {
@@ -502,64 +460,42 @@ server <- function(input, output) {
       data
     }
     
-    ##++++++++++++++++++++++++++++ Detrending ++++++++++++++++++++++++++++++++++++++++###
-    if (input$detrend == TRUE) {
-      
-      #cn <- colnames(data) # for later use in the returning original column names
-      
-      #library(pracma)
-      
-      # br <- 4                                                        # You can try different break points
-      # break.points <- seq(from=br,to=dim(data)[1], by=br)
-      # data.dt <- data                                                 # create a duplicate data frame
-      
-      dat31 <- c()
-      for(i in 1:dim(data)[2]){
-        tmp <- detrend(data[,i], tt = 'linear', bp = c()) # fits a "moving" linear regression to the data and subracts the "time" component from the total intensities
-        dat31 <- cbind(dat31,tmp)
-      }
-      dat31 <- as.data.frame(dat31)
-      
-      cn <- colnames(data) # for use in the next line for the returning original column names
-      colnames(dat31) <- cn
-      dataID <- dat31
-      
-      dataID$Cell_number = 1:nrow(dataID)
-      
-      ############### recalculate background for download
-      whiteImg <- matrix(1, dim(img3_F1), dim(img3_F1)) # create an array of 1s, which will be rendered white
-      
-      bkg <- whiteImg - nuclei #subtract cells masks from white image to get a mask of a background
-      
-      #display(bkg, "raster")
-      
-      data_bkg <- data.frame(col1 = rep(NA, 1))
-      
-      
-      
-      for(i in 1:dim(img3)[3]) {                             # A for-loop to create a vector with background intensities timeline
-        
-        
-        new_col <- computeFeatures(bkg,     img3[,,i], xname = "",   
-                                   refnames = "fr_")                      # Creating new variable
-        data_bkg[ , i] <- new_col[,12]                     # Adding new columns with next timeframe data to a data
-        colnames(data_bkg)[i] <- paste0("Frame_", i)    # Renaming new variable
-      }
-      
-      ####### add last row to the DF with background
-      data_bkg$bkg <- "background"
-      dataID[dim(dataID)[1]+1, ] <- data_bkg[1, ]
-      dataID
-    }
+    
     #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++###
     
-    else if (input$detrend == FALSE) {
+    if (input$detrend == FALSE && input$subtract == T) {
+      
+      dataID <- data
       
       
+      dataID$Cell_number = 1:nrow(dataID)
+      
+      ###### add last row to the DF with background
+
+      data_bkg$bkg <- "background"
+      dataID[dim(dataID)[1]+1, ] <- data_bkg[1, ]
+      dataID
+      
+      
+    }
+    
+    else if (input$detrend == FALSE && input$subtract == F) {
+      
+      dataID <- data
+      
+      
+      dataID$Cell_number = 1:nrow(dataID)
+      dataID
+      
+    }
+    
+    else if (input$detrend == TRUE) {
+      
+                                           
       
       dat31 <- c()
       for(i in 1:dim(data)[2]){
-        tmp <- data[,i] # fits a "moving" linear regression to the data and subracts the "time" component from the total intensities
+        tmp <- detrend(data[,i], tt = 'linear', bp = c()) # fits a "moving" linear regression to the data and subtracts the "time" component from the total intensities
         dat31 <- cbind(dat31,tmp)
       }
       dat31 <- as.data.frame(dat31)
@@ -568,14 +504,14 @@ server <- function(input, output) {
       colnames(dat31) <- cn
       dataID <- dat31
       
-      
       dataID$Cell_number = 1:nrow(dataID)
+      
       ############### recalculate background for download
       whiteImg <- matrix(1, dim(img3_F1), dim(img3_F1)) # create an array of 1s, which will be rendered white
       
       bkg <- whiteImg - nuclei #subtract cells masks from white image to get a mask of a background
       
-      #display(bkg, "raster")
+      
       
       data_bkg <- data.frame(col1 = rep(NA, 1))
       
@@ -591,12 +527,9 @@ server <- function(input, output) {
       }
       
       ####### add last row to the DF with background
-      
       data_bkg$bkg <- "background"
       dataID[dim(dataID)[1]+1, ] <- data_bkg[1, ]
       dataID
-      
-      
     }
     
     
@@ -678,7 +611,7 @@ server <- function(input, output) {
       colnames(dat1) <- cl
       dat1 <- as.data.frame.array(dat1)
       
-      dat1.dt <- dat1                                                    #new dataframe for detrended ersults 
+      dat1.dt <- dat1                                                    #new dataframe for detrended results 
       
       for(i in 1:dim(dat1)[2]){                                          # run each Sample in a loop
         dat1.dt[,i] <- detrend(dat1[,i], tt = 'linear', bp = c())       # detrend the data using linear model
