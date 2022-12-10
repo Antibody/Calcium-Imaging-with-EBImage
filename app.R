@@ -625,33 +625,7 @@ server <- function(input, output) {
       dat1.dt.z <- dat1.dt-min.vals
       drange.z <- data.frame(row.names = cl, "min" = apply(dat1.dt.z,2,min), "max" = apply(dat1.dt.z,2,max))
       #################################################################
-      
-      
-      #################################################################
-      ####           detect peaks & smooth out the data            ####
-      #
-      # smoothing is needed because the raw data is very "spiky", this makes peak detection hard
-      # peak is defined as high intensity: normalized intensity > 2x sd &
-      # peak has >2 successive measurements increase before peak maximum &
-      # peak has >2 successive measurements decrease after peak maximum
-      smoothing.parameter <- 0.02                                     # Smooting parameter for lowess (larger values make smoothing rougher)
-      successive.points <- 3                                          # how many successive points need to increase or decrease
-      
-      dat1.peaks <- list()                                            # Peaks are stores in a list
-      dat1.dt.z.s <- dat1.dt.z                                        # The smoothed values go here
-      
-      for(i in 2:ncol(dat1.dt)){
-        tmp.data <- dat1.dt.z[,i]
-        noiselevel <- 2*sd(tmp.data)
-        tmp.data <- lowess(tmp.data, f=smoothing.parameter)$y
-        dat1.dt.z.s[,i] <- tmp.data
-        tmp <- findpeaks(tmp.data, nups=successive.points, ndowns=successive.points, minpeakheight=noiselevel )
-        if(is.null(tmp[,1])) { tmp <- matrix(NA,ncol=4) }
-        else { tmp <- tmp }
-        tmp <- data.frame("Intensity" = tmp[,1], "Peak.max"=tmp[,2], "Peak.start"=tmp[,4], "Peak.end"=tmp[,4], "Noiselevel" = noiselevel)
-        dat1.peaks[[i-1]] <- tmp
-      }; names(dat1.peaks) <- colnames(dat1.dt)[-1]
-      
+                     
       
       #################################################################
       ####          Build "pretty" heatmap            ####
@@ -814,32 +788,7 @@ server <- function(input, output) {
     dat1.dt.z <- dat1.dt-min.vals
     drange.z <- data.frame(row.names = cl, "min" = apply(dat1.dt.z,2,min), "max" = apply(dat1.dt.z,2,max))
     #################################################################
-    
-    
-    #################################################################
-    ####           detect peaks & smooth out the data            ####
-    #
-    # smoothing is needed because the raw data is very "spiky", this makes peak detection hard
-    # peak is defined as high intensity: normalized intensity > 2x sd &
-    # peak has >2 successive measurements increase before peak maximum &
-    # peak has >2 successive measurements decrease after peak maximum
-    smoothing.parameter <- 0.02                                     # Smooting parameter for lowess (larger values make smoothing rougher)
-    successive.points <- 3                                          # how many successive points need to increase or decrease
-    
-    dat1.peaks <- list()                                            # Peaks are stores in a list
-    dat1.dt.z.s <- dat1.dt.z                                        # The smoothed values go here
-    
-    for(i in 2:ncol(dat1.dt)){
-      tmp.data <- dat1.dt.z[,i]
-      noiselevel <- 2*sd(tmp.data)
-      tmp.data <- lowess(tmp.data, f=smoothing.parameter)$y
-      dat1.dt.z.s[,i] <- tmp.data
-      tmp <- findpeaks(tmp.data, nups=successive.points, ndowns=successive.points, minpeakheight=noiselevel )
-      if(is.null(tmp[,1])) { tmp <- matrix(NA,ncol=4) }
-      else { tmp <- tmp }
-      tmp <- data.frame("Intensity" = tmp[,1], "Peak.max"=tmp[,2], "Peak.start"=tmp[,4], "Peak.end"=tmp[,4], "Noiselevel" = noiselevel)
-      dat1.peaks[[i-1]] <- tmp
-    }; names(dat1.peaks) <- colnames(dat1.dt)[-1]
+       
     
     ####################################################################
     ################ correlation table summary generation ##
@@ -963,33 +912,8 @@ server <- function(input, output) {
         dat1.dt.z <- dat1.dt-min.vals
         drange.z <- data.frame(row.names = cl, "min" = apply(dat1.dt.z,2,min), "max" = apply(dat1.dt.z,2,max))
         #################################################################
-        
-        
-        #################################################################
-        ####           detect peaks & smooth out the data            ####
-        #
-        # smoothing is needed because the raw data is very "spiky", this makes peak detection hard
-        # peak is defined as high intensity: normalized intensity > 2x sd &
-        # peak has >2 successive measurements increase before peak maximum &
-        # peak has >2 successive measurements decrease after peak maximum
-        smoothing.parameter <- 0.02                                     # Smooting parameter for lowess (larger values make smoothing rougher)
-        successive.points <- 3                                          # how many successive points need to increase or decrease
-        
-        dat1.peaks <- list()                                            # Peaks are stores in a list
-        dat1.dt.z.s <- dat1.dt.z                                        # The smoothed values go here
-        
-        for(i in 2:ncol(dat1.dt)){
-          tmp.data <- dat1.dt.z[,i]
-          noiselevel <- 2*sd(tmp.data)
-          tmp.data <- lowess(tmp.data, f=smoothing.parameter)$y
-          dat1.dt.z.s[,i] <- tmp.data
-          tmp <- findpeaks(tmp.data, nups=successive.points, ndowns=successive.points, minpeakheight=noiselevel )
-          if(is.null(tmp[,1])) { tmp <- matrix(NA,ncol=4) }
-          else { tmp <- tmp }
-          tmp <- data.frame("Intensity" = tmp[,1], "Peak.max"=tmp[,2], "Peak.start"=tmp[,4], "Peak.end"=tmp[,4], "Noiselevel" = noiselevel)
-          dat1.peaks[[i-1]] <- tmp
-        }; names(dat1.peaks) <- colnames(dat1.dt)[-1]
-        
+              
+                
         ####################################################################
         ################ correlation table summary generation ##
         
