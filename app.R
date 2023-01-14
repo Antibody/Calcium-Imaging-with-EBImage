@@ -12,13 +12,16 @@ library(pracma)
 #library(dplyr)
 library('shinythemes')
 library('shinycssloaders')
+library(shinybusy)
 library(BiocManager)
 options(repos = BiocManager::repositories())
 knitr::opts_chunk$set(echo = TRUE)
 
 ui <- fluidPage(theme = shinytheme("paper"),
-                titlePanel(h6("Calcium Imaging v.0.1.3")),
+                titlePanel(h6("Calcium Imaging v.0.1.4")),
                 
+                #++++++++++++Busy indicator +++++++++++++++
+                add_busy_spinner(spin = "radar", margins = c(400, 1000), color ="darkblue"),
                 #++++++++++++CSS for notifications +++++++++++++++
                 tags$head(
                   tags$style(
@@ -39,42 +42,42 @@ ui <- fluidPage(theme = shinytheme("paper"),
                                 label = 'Select an Image',
                                 multiple = TRUE,
                                 accept=c('image/tif', 'image/jpeg')),
-                     
-                      
-                       wellPanel(h5("Image mask adjustments"),
-                      
-                      # A parameter for EBImage's makeBrush
-                      numericInput(
-                        inputId="sigma",
-                        label="Image blurring (sigma)",
-                        value=7,
-                        min = 1,
-                        max = 111,
-                        step = 2
-                      ),
                       
                       
-                      numericInput(
-                        inputId="size",
-                        label="Size (px)",
-                        value=101,
-                        min = 1,
-                        max = 1011,
-                        step = 2
-                      ),
-                      
-                      sliderInput("offset", h6("offset"), 0, 1, 0.07),
-                      
-                      numericInput(
-                        inputId="rad",
-                        label="masking radius",
-                        value=9,
-                        min = 1,
-                        max = 111,
-                        step = 2
-                      ),
-                      
-                       )
+                      wellPanel(h5("Image mask adjustments"),
+                                
+                                # A parameter for EBImage's makeBrush
+                                numericInput(
+                                  inputId="sigma",
+                                  label="Image blurring (sigma)",
+                                  value=7,
+                                  min = 1,
+                                  max = 111,
+                                  step = 2
+                                ),
+                                
+                                
+                                numericInput(
+                                  inputId="size",
+                                  label="Size (px)",
+                                  value=101,
+                                  min = 1,
+                                  max = 1011,
+                                  step = 2
+                                ),
+                                
+                                sliderInput("offset", h6("offset"), 0, 1, 0.07),
+                                
+                                numericInput(
+                                  inputId="rad",
+                                  label="masking radius",
+                                  value=9,
+                                  min = 1,
+                                  max = 111,
+                                  step = 2
+                                ),
+                                
+                      )
                       
                     ),
                   ),
@@ -108,14 +111,58 @@ ui <- fluidPage(theme = shinytheme("paper"),
                       ),
                       
                       tabPanel("Plot",
+                               
+                               
+                               
+                               
                                br(),
-                               actionButton("buildPlot", "Build"), 
+                               
+                               fluidRow( column(4, wellPanel(h5("Plot and data options"),
                                checkboxInput(inputId = "detrend",
                                              label = "Detrend my data",
                                              value = FALSE),
-                               checkboxInput(inputId = "subtract",
-                                             label = "Subtract background",
+                               
+                               conditionalPanel(
+                                 condition = "input.detrend == true",
+                               checkboxInput(inputId = "break_point",
+                                             label = "Does data contain break points",
                                              value = FALSE),
+                               
+                               conditionalPanel(
+                                 condition = "input.break_point == true",
+                                 numericInput("bp", "Break point value (it should be higher than your peaks base) :", value=10, min = 1, max = 10000),
+                               
+                              
+                               
+                               )),
+                               
+                               br(),
+                               actionButton("buildPlot", "Build plot"), 
+                               
+                               )),
+                               
+                               column(4, wellPanel(h5(""),
+                                                             
+                                                               
+                                                               checkboxInput(inputId = "subtract",
+                                                                       label = "Subtract background",
+                                                                       value = FALSE),            
+                                                   
+                                                   
+                                                               checkboxInput(inputId = "select",
+                                                                             label = "Select individual trace",
+                                                                             value = FALSE),
+                                                               conditionalPanel(
+                                                                 condition = "input.select == true",
+                                                                 numericInput("trace", "Trace number:", value=1, min = 1, max = 1000),
+                                                                    checkboxInput(inputId = "deltaF",
+                                                                               label = "Calculate deltaF/F(0)",
+                                                                               value = FALSE),
+                                                               
+                                                             ),
+                                                             
+                               ))),
+                               
                                br(),
                                plotOutput("plot", height = "100%"),
                                
@@ -126,11 +173,6 @@ ui <- fluidPage(theme = shinytheme("paper"),
                       ),
                       tabPanel("Correlations", 
                                br(),
-                               h4(tags$b("Build heatmap", style = "color:darkblue")),
-                               actionButton("buildHeat", "Build"),
-                               br(),
-                               plotOutput("heat", height = "100%"),
-                               
                                br(),
                                h4(tags$b("Correlation Table", style = "color:darkblue")),
                                sliderInput("adjPval", h6("Adjusted p-value threshold"), 0, 0.05, 0.01),
@@ -139,19 +181,26 @@ ui <- fluidPage(theme = shinytheme("paper"),
                                downloadButton("downloadTable", "Download"),
                                verbatimTextOutput('table'),
                                
+                               h4(tags$b("Build heatmap", style = "color:darkblue")),
+                               actionButton("buildHeat", "Build"),
+                               br(),
+                               plotOutput("heat", height = "100%"),
+                               
+                               
+                               
                       ),
                       
-                     
                       
                       
-                      tabPanel("Interactive image browser", displayOutput("widget"))
+                      
+                      tabPanel("Interactive image browser", displayOutput("widget")) 
                       
                     )
                   )
                 )
 )
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   
   output$files <- renderTable(input$files)
   
@@ -159,14 +208,14 @@ server <- function(input, output) {
     files <- input$files
     files$datapath <- gsub("\\\\", "/", files$datapath)
     files
-                   })
+  })
   
-#+++++++++++++++++++++++++ This function extracts numbers from text +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++#
+  #+++++++++++++++++++++++++ This function extracts numbers from text +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++#
   numbersFromText <- function(text) {        # this function extracts numbers from text e.g. for the removal of unwanted cells
     text <- gsub(" ", "", text)
     split <- strsplit(text, ",", fixed = FALSE)[[1]]
     as.numeric(split)
-                                     }
+  }
   
   
   #+++++++++++++++++++++++ send message about subtract function ++++++++++++++++++++++++++#
@@ -174,13 +223,43 @@ server <- function(input, output) {
   observeEvent(input$subtract , {
     if (input$subtract==TRUE)  {
       showNotification("Background is calculated from all of the area that is considered as non-cells. It also adds background values as the last line in the downlodable report table", duration = 10, type = "message")
-                                }                                      
-                                 })
+    }                                      
+  })
+  
+  
+  # #+++++++++++++++++++++++ send message negative min value in the trace that is used to calculate dF/F ++++++++++++++++++++++++++#
+  # observeEvent(input$buildPlot , {
+  #   if (minDataID < 0)  {
+  #     showNotification("For the calculation of dF/F a negative minimum value was used", duration = 10, type = "message")
+  #   }                                      
+  # })
+  
+  
+  
+  #+++++++++++++++++++++++ unchecks subtract box if individual traces are chosen and vice-versa +++++++++++++++++++#
+  observeEvent(input$deltaF == TRUE ,
+               if (input$deltaF == TRUE)  {
+                 { #updatedValue = !input$nonParametricTests
+                   updateCheckboxInput(session, "subtract",  value=FALSE)
+                   updateCheckboxInput(session, "deltaF",  value=TRUE)
+                 }
+               }
+  )
+  
+  
+  observeEvent(input$subtract == TRUE ,
+               if (input$subtract == TRUE)  {
+                 { #updatedValue = !input$nonParametricTests
+                   updateCheckboxInput(session, "deltaF",  value=FALSE)
+                   updateCheckboxInput(session, "subtract",  value=TRUE)
+                 }
+               }
+  )
   
   ##########################################################################################################
   ################# Build Plot #############################################################################
   
-
+  
   observeEvent(input$buildPlot, {
     output$plot <- renderPlot({
       img3 = readImage(files = input$files$datapath)
@@ -189,7 +268,7 @@ server <- function(input, output) {
       img3 <- resize(img3, 512, 512)
       img3_F1 <- resize(img3_F1, 512, 512)
       
-     
+      
       cellsSmooth = Image(dim = dim(img3_F1))
       
       sigma <- input$sigma
@@ -217,7 +296,7 @@ server <- function(input, output) {
       nucMask = fillHull(nucMask)
       nuclei = propagate(cellsSmooth, nucSeed, mask = nucMask)
       #EBImage::display(nuclei,method = "raster")
-    
+      
       
       nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3_F1), col = "#ffff00")
       #EBImage::display(nucSegOnNuc,method = "raster")
@@ -281,6 +360,7 @@ server <- function(input, output) {
                                      refnames = "fr_")                      # Creating new variable
           data[ , i] <- new_col[,12]                     # Adding column with intensities [12] to a new dataframe
           colnames(data)[i] <- paste0("", i)    # Renaming new variable
+          data
         }
       }
       
@@ -288,71 +368,159 @@ server <- function(input, output) {
       
       
       if (input$rmvCell == T) {
-
+        
         data <- data[-rmCell, ]
         data
       }
       
+   
+
+     
+      
+      
       ##++++++++++++++++++++++++++++ Detrending ++++++++++++++++++++++++++++++++++++++++###
       if (input$detrend == TRUE) {
-      
+       
+       
+        ###################### break points ############################################### 
+        if (input$break_point == F && input$detrend == TRUE) {
+          # bp <- input$bp
+          # break.points <- seq(from=bp,to=dim(data)[2], by=bp)
+
+          data.t <- t(data) # matrix transposition
+          colnames(data.t) <- rownames(data) #restoration of column names
+          data.t.df <- as.data.frame(data.t) # conversion to the list formate
+
+          data.t.df.dt <- data.t.df
+
+          #detrending without breaking points###
+          for(i in 1:dim(data)[1]){                                       # run each Sample in a loop
+            data.t.df.dt[,i] <- detrend(data.t.df[,i], tt = 'linear', bp=c())       # detrend the data
+                                   }
+
+          data.dt <- t(data.t.df.dt)
+          data.dt.df <- as.data.frame(data.dt)
+          dataID <- data.dt.df
+
+                                                              }
+
+      else if (input$break_point == T && input$detrend == TRUE) {
+          #bp <- input$bp
+          break.points <- seq(from=input$bp,to=dim(data)[2], by=input$bp)
+          
+          data.t <- t(data) # matrix transposition
+          colnames(data.t) <- rownames(data) #restoration of column names
+          data.t.df <- as.data.frame(data.t) # conversion to the list formate
+          
+          data.t.df.dt <- data.t.df 
+          
+          #detrending with breaking points### 
+          for(i in 1:dim(data)[1]){                                       # run each Sample in a loop
+            data.t.df.dt[,i] <- detrend(data.t.df[,i], bp=break.points)       # detrend the data
+                                  }
+          
+          data.dt <- t(data.t.df.dt)
+          data.dt.df <- as.data.frame(data.dt)
+          dataID <- data.dt.df
+          dataID
+                                 }
         
-        dat31 <- c()
-        for(i in 1:dim(data)[2]){
-          tmp <- detrend(data[,i], tt = 'linear', bp = c()) # fits a "moving" linear regression to the data and subracts the "time" component from the total intensities
-          dat31 <- cbind(dat31,tmp)
-        }
-        dat31 <- as.data.frame(dat31)
         
-        colnames(dat31) <- colnames(data) # this line is for the returning original column names
-        
-        dataID <- dat31
-      
-        dataID$id = 1:nrow(dataID)
-        dataMelt = melt(dataID, variable.name = "Frame", value.name = "Intensity", id.vars = "id")
-      }
+              
+              #++++++++++++++++++++ select a single trace ++++++++++++++#
+              if (input$select == T) {
+                dataID <- (dataID[input$trace, ])
+                #++++++++++++++++++++ calculate deltaF/F based on trace minimal value++++++++++++++#
+                if (input$deltaF == T) {
+                  #dataID <- (dataID[input$trace, ])
+                  minDataID <- min(dataID)
+                  if (minDataID > 0) {
+                    dataID <- (dataID - minDataID)/minDataID
+                  }
+                  else if (minDataID < 0) {
+                    
+                    dataID = (dataID - minDataID)/minDataID
+                    dataID = -dataID
+                    
+                  }
+                }
+                dataID
+              }
+              
+              
+              dataID$id = 1:nrow(dataID)
+              
+              
+              
+              dataMelt = melt(dataID, variable.name = "Frame", value.name = "Intensity", id.vars = "id")
+                                         }
       #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++###
-      
+
       else if (input$detrend == FALSE) {
         
-      
         
-        dat31 <- c()
-        for(i in 1:dim(data)[2]){
-          tmp <- data[,i] # fits a "moving" linear regression to the data and subracts the "time" component from the total intensities
-          dat31 <- cbind(dat31,tmp)
-        }
-        dat31 <- as.data.frame(dat31)
         
-        colnames(dat31) <- colnames(data) # this line is for the returning original column names
-        dataID <- dat31
-        
-        # dataID <- cbind(cellID = c(1:dim(fr1)[1]), dataID)
+        # dat31 <- c()
+        # for(i in 1:dim(data)[2]){
+        #   tmp <- data[,i]
+        #   dat31 <- cbind(dat31,tmp)
+        # }
+        # dat31 <- as.data.frame(dat31)
         # 
-        # dataID <- dataID[,-1]
+        # colnames(dat31) <- colnames(data) # this line is for the returning original column names
+        dataID <- data
+        
+        
+        #++++++++++++++++++++ select a single trace ++++++++++++++#
+        if (input$select == T) {
+          dataID <- (dataID[input$trace, ])
+          #++++++++++++++++++++ calculate deltaF/F based on trace minimal value++++++++++++++#
+          if (input$deltaF == T) {
+            #dataID <- (dataID[input$trace, ])
+            minDataID <- min(dataID)
+            
+              dataID <- (dataID - minDataID)/minDataID
+            
+                                           }
+          dataID
+                                 }
+        
         dataID$id = 1:nrow(dataID)
+      
         dataMelt = melt(dataID, variable.name = "Frame", value.name = "Intensity", id.vars = "id")
       }
-      
-      
-      
-      
+    #####################################################################################################
+      #++++++++++++++++++++++++++++ build graph  either for deltaF or for Intensity ++++++++++++++++++++#  
+      if (input$deltaF == T) {
+        dataMelt = melt(dataID, variable.name = "Frame", value.name = "deltaF_over_F", id.vars = "id")
+        
+        p <-      ggplot(dataMelt, aes(x=Frame, y=deltaF_over_F, group=id, color=id)) +
+          geom_textline(aes(label = id), hjust = 1) +
+          theme_bw() +
+          theme(legend.position = "none")
+        return(p)
+      }
+      #++++++++++++++++++++++++++++ build graph  for Intensity ++++++++++++++++++++#  
+      if (input$deltaF == F) {
       p <-      ggplot(dataMelt, aes(x=Frame, y=Intensity, group=id, color=id)) +
         geom_textline(aes(label = id), hjust = 1) +
         theme_bw() +
         theme(legend.position = "none")
       return(p)
-      
+                              }
       
       
     } , height = 800, width = 1200)
   })
- ############################################################################ 
+  ############################################################################ 
   ############# preparing a table for downloading plot data ################
   tablePlotData <- reactive({
+    # #+++++++++++++++++++++++++++ add busy indicator for download+++++++++++++++++++++#
+    # show_modal_gif( src = "https://jeroen.github.io/images/banana.gif" ) 
+    
     img3 = readImage(files = input$files$datapath)
     img3_F1 = readImage((files = input$files$datapath)[1]) # first frame only
- 
+    
     img3 <- resize(img3, 512, 512)
     img3_F1 <- resize(img3_F1, 512, 512)
     
@@ -408,7 +576,7 @@ server <- function(input, output) {
                                    refnames = "fr_")                      # Creating new variable
         data[ , i] <- new_col[,12]                     # Adding new variable to data
         colnames(data)[i] <- paste0("Frame_", i)    # Renaming new variable
-                               }
+      }
       
       whiteImg <- matrix(1, dim(img3_F1), dim(img3_F1)) # create an array of 1s, which will be rendered white
       
@@ -425,14 +593,14 @@ server <- function(input, output) {
                                    refnames = "fr_")                      # Creating new variable
         data_bkg[ , i] <- new_col[,12]                     # Adding new columns with next timeframe data to a data
         colnames(data_bkg)[i] <- paste0("Frame_", i)    # Renaming new variable
-                                 }
+      }
       
       data_subtr <- sweep(as.matrix(data), MARGIN = 2, as.matrix(data_bkg)) # SWEEP function subtracts a vector (has to be converted 
       # to a matrix to work with sweep) with background from data DF (also as a matrix) row by row (this is why I use "MARGIN=2") 
       
       data <- as.data.frame(data_subtr) #convert matrix back into a DF
       
-                                   }
+    }
     
     ###################### If background subtraction is NOT checked ###############################################
     
@@ -461,21 +629,32 @@ server <- function(input, output) {
     }
     
     
-    #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++###
+  #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++###
     
     if (input$detrend == FALSE && input$subtract == T) {
       
       dataID <- data
-      
+      #++++++++++++++++++++ select a single trace ++++++++++++++#
+      if (input$select == T) {
+        dataID <- (dataID[input$trace, ])
+        #++++++++++++++++++++ calculate deltaF/F based on trace minimal value++++++++++++++#
+        if (input$deltaF == T) {
+          #dataID <- (dataID[input$trace, ])
+          minDataID <- min(dataID)
+          dataID <- (dataID - minDataID)/minDataID
+        }
+        
+      }
       
       dataID$Cell_number = 1:nrow(dataID)
       
       ###### add last row to the DF with background
-
+      
       data_bkg$bkg <- "background"
       dataID[dim(dataID)[1]+1, ] <- data_bkg[1, ]
-      dataID
+  
       
+      dataID
       
     }
     
@@ -483,26 +662,87 @@ server <- function(input, output) {
       
       dataID <- data
       
-      
+      #++++++++++++++++++++ select a single trace ++++++++++++++#
+      if (input$select == T) {
+        dataID <- (dataID[input$trace, ])
+        #++++++++++++++++++++ calculate deltaF/F based on trace minimal value++++++++++++++#
+        if (input$deltaF == T) {
+          #dataID <- (dataID[input$trace, ])
+          minDataID <- min(dataID)
+          dataID <- (dataID - minDataID)/minDataID
+        }
+      }
       dataID$Cell_number = 1:nrow(dataID)
-      dataID
+      
+        dataID
       
     }
     
     else if (input$detrend == TRUE) {
       
-                                           
       
-      dat31 <- c()
-      for(i in 1:dim(data)[2]){
-        tmp <- detrend(data[,i], tt = 'linear', bp = c()) # fits a "moving" linear regression to the data and subtracts the "time" component from the total intensities
-        dat31 <- cbind(dat31,tmp)
+      
+      ###################### break points ############################################### 
+      if (input$break_point == F && input$detrend == TRUE) {
+        # bp <- input$bp
+        # break.points <- seq(from=bp,to=dim(data)[2], by=bp)
+        
+        data.t <- t(data) # matrix transposition
+        colnames(data.t) <- rownames(data) #restoration of column names
+        data.t.df <- as.data.frame(data.t) # conversion to the list formate
+        
+        data.t.df.dt <- data.t.df
+        
+        #detrending without breaking points###
+        for(i in 1:dim(data)[1]){                                       # run each Sample in a loop
+          data.t.df.dt[,i] <- detrend(data.t.df[,i], tt = 'linear', bp=c())       # detrend the data
+        }
+        
+        data.dt <- t(data.t.df.dt)
+        data.dt.df <- as.data.frame(data.dt)
+        dataID <- data.dt.df
+        
       }
-      dat31 <- as.data.frame(dat31)
       
-      cn <- colnames(data) # for use in the next line for the returning original column names
-      colnames(dat31) <- cn
-      dataID <- dat31
+      else if (input$break_point == T && input$detrend == TRUE) {
+        #bp <- input$bp
+        break.points <- seq(from=input$bp,to=dim(data)[2], by=input$bp)
+        
+        data.t <- t(data) # matrix transposition
+        colnames(data.t) <- rownames(data) #restoration of column names
+        data.t.df <- as.data.frame(data.t) # conversion to the list formate
+        
+        data.t.df.dt <- data.t.df 
+        
+        #detrending with breaking points### 
+        for(i in 1:dim(data)[1]){                                       # run each Sample in a loop
+          data.t.df.dt[,i] <- detrend(data.t.df[,i], bp=break.points)       # detrend the data
+        }
+        
+        data.dt <- t(data.t.df.dt)
+        data.dt.df <- as.data.frame(data.dt)
+        dataID <- data.dt.df
+        dataID
+      }
+      
+      #++++++++++++++++++++ select a single trace ++++++++++++++#
+      if (input$select == T) {
+        dataID <- (dataID[input$trace, ])
+        #++++++++++++++++++++ calculate deltaF/F based on trace minimal value++++++++++++++#
+        if (input$deltaF == T) {
+          #dataID <- (dataID[input$trace, ])
+          minDataID <- min(dataID)
+          if (minDataID > 0) {
+            dataID <- (dataID - minDataID)/minDataID
+          }
+          else if (minDataID < 0) {
+            
+            dataID = (dataID - minDataID)/minDataID
+            dataID = -dataID
+            
+          }
+        }
+      }
       
       dataID$Cell_number = 1:nrow(dataID)
       
@@ -529,11 +769,14 @@ server <- function(input, output) {
       ####### add last row to the DF with background
       data_bkg$bkg <- "background"
       dataID[dim(dataID)[1]+1, ] <- data_bkg[1, ]
+      
+   
       dataID
     }
+    # #+++++++++++++++++++++++++++ remove busy indicator after the download+++++++++++++++++++++#
+    # remove_modal_gif() 
     
-    
-                            })
+  })
   
   #####################################################################################
   ############################## build correlation HEATMAP #############################
@@ -590,7 +833,7 @@ server <- function(input, output) {
         colnames(data)[i] <- paste0("", i)    # Renaming new variable
       }
       
-     
+      
       
       data.c <- cbind(Cell = c(1:dim(fr1)[1]), data)
       
@@ -599,6 +842,7 @@ server <- function(input, output) {
         data.c <- data.c[-rmCell, ]
         data.c
       }
+ 
       
       dat1.t <- t(data.c)
       dat1.t.NoC <- dat1.t[-1,]
@@ -607,6 +851,9 @@ server <- function(input, output) {
       rownames(data.t.c) <- NULL
       dat1 <- data.t.c
       
+      
+      
+      
       cl <- c("Time_Frame",paste0("Cell.0",1:9),paste0("Cell.",10:(dim(dat1)[2]-1)))
       colnames(dat1) <- cl
       dat1 <- as.data.frame.array(dat1)
@@ -614,10 +861,10 @@ server <- function(input, output) {
       dat1.dt <- dat1                                                    #new dataframe for detrended results 
       
       for(i in 1:dim(dat1)[2]){                                          # run each Sample in a loop
-        dat1.dt[,i] <- detrend(dat1[,i], tt = 'linear', bp = c())       # detrend the data using linear model
+        dat1.dt[,i] <- detrend(dat1[,i], tt = 'linear', bp=c())       # detrend the data using linear model
       }; dat1.dt[,1] <- dat1[,1] 
       
-      
+
       #################################################################
       ### Find out the range of the data and set the minimum value to zero
       drange <- data.frame(row.names = cl, "min" = apply(dat1.dt,2,min), "max" = apply(dat1.dt,2,max))
@@ -625,8 +872,7 @@ server <- function(input, output) {
       dat1.dt.z <- dat1.dt-min.vals
       drange.z <- data.frame(row.names = cl, "min" = apply(dat1.dt.z,2,min), "max" = apply(dat1.dt.z,2,max))
       #################################################################
-                     
-      
+
       #################################################################
       ####          Build "pretty" heatmap            ####
       # cut the heatmap into segments (first identify by eye how many true sub-clusters you have
@@ -704,6 +950,10 @@ server <- function(input, output) {
   })
   
   tableInput <- reactive({
+    
+    #+++++++++++++++++++++++++++ add busy indicator for download+++++++++++++++++++++#
+    show_modal_gif( src = "https://jeroen.github.io/images/banana.gif" ) 
+    
     img3 = readImage(files = input$files$datapath)
     img3_F1 = readImage((files = input$files$datapath)[1]) # first frame only
     img3 <- resize(img3, 512, 512)
@@ -735,12 +985,12 @@ server <- function(input, output) {
     nucMask = fillHull(nucMask)
     nuclei = propagate(cellsSmooth, nucSeed, mask = nucMask)
     
-   
+    
     
     #nucSegOnNuc  = paintObjects(nuclei, tgt = toRGB(img3_F1), col = "#ffff00")
     
     #fts = computeFeatures.moment(nuclei)
-  
+    
     
     fr1 = computeFeatures(nuclei,     img3_F1, xname = "Frame1",  refnames = "c1") # this is used to determine how many ROI were detected in the first frame
     data <- data.frame(col1 = rep(NA, dim(fr1)[1]))
@@ -788,8 +1038,7 @@ server <- function(input, output) {
     dat1.dt.z <- dat1.dt-min.vals
     drange.z <- data.frame(row.names = cl, "min" = apply(dat1.dt.z,2,min), "max" = apply(dat1.dt.z,2,max))
     #################################################################
-       
-    
+   
     ####################################################################
     ################ correlation table summary generation ##
     
@@ -912,8 +1161,10 @@ server <- function(input, output) {
         dat1.dt.z <- dat1.dt-min.vals
         drange.z <- data.frame(row.names = cl, "min" = apply(dat1.dt.z,2,min), "max" = apply(dat1.dt.z,2,max))
         #################################################################
-              
-                
+        
+        
+        
+        
         ####################################################################
         ################ correlation table summary generation ##
         
@@ -948,9 +1199,11 @@ server <- function(input, output) {
         #comb[comb$Adj.P.Value<0.01&comb$correlation>0.8,]
         
       })
+      
       tableInput()
     })
     
+   
   })
   
   
@@ -961,20 +1214,36 @@ server <- function(input, output) {
     filename = 'Calcium_traces.csv',
     
     content = function(file) {
+      
+      #+++++++++++++++++++++++++++ add busy indicator for download+++++++++++++++++++++#
+      show_modal_gif( src = "https://jeroen.github.io/images/banana.gif" )
+      
       write.csv(tablePlotData(), file, row.names = FALSE)
+      
+      #+++++++++++++++++++++++++++ remove busy indicator after the download+++++++++++++++++++++#
+      remove_modal_gif() 
       #dev.off()
     }              )
   
   
   output$downloadTable <- downloadHandler(
     
-    
     filename = 'Correlaition_Table.csv',
     
     content = function(file) {
+      #+++++++++++++++++++++++++++ add busy indicator for download+++++++++++++++++++++#
+      show_modal_gif( src = "https://jeroen.github.io/images/banana.gif" )
       write.csv(tableInput(), file, row.names = FALSE)
+      
+      #+++++++++++++++++++++++++++ remove busy indicator after the download+++++++++++++++++++++#
+      remove_modal_gif() 
       #dev.off()
-    }              )
+    }              
+    
+    
+    
+    
+    )
   
   output$widget <- renderDisplay({
     display(imagesUploaded(), method = 'browser')
@@ -1030,17 +1299,17 @@ server <- function(input, output) {
         
         #if(is.na(rmCell)) return(NULL) 
         if (input$rmvCell == T) {
-             
-            fts <- fts[-rmCell, ]
-            fts
-                                }
+          
+          fts <- fts[-rmCell, ]
+          fts
+        }
         
         text(fts[,"m.cx"], fts[,"m.cy"], labels=seq_len(nrow(fts)), col="red", cex=1)
         
         
       }, height = 512, width = 512)
       
-     
+      
     }
     
     else if (input$addLabels==FALSE) {
